@@ -1,0 +1,310 @@
+/* ==========================================================================
+   GodoyFin - Controle Financeiro Pessoal Inteligente (Gabriel & Mirela)
+   Estilo Visual: Nubank / Linear Clean Dashboard (Light & Dark Mode)
+   ========================================================================== */
+
+:root {
+  --bg-primary: #f6f8fc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --bg-glass: rgba(255, 255, 255, 0.88);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border-color: rgba(15, 23, 42, 0.08);
+  --accent-primary: #820ad1;
+  --accent-primary-hover: #6d08b0;
+  --accent-secondary: #ec4899;
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 16px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 10px 28px -4px rgba(15, 23, 42, 0.08);
+
+  /* Cores por Setor */
+  --cat-delivery: #ef4444;
+  --cat-transporte: #334155;
+  --cat-mercado: #10b981;
+  --cat-compras: #8b5cf6;
+  --cat-saude: #06b6d4;
+}
+
+.dark {
+  --bg-primary: #090d16;
+  --bg-secondary: #111622;
+  --bg-tertiary: #192030;
+  --bg-glass: rgba(17, 22, 34, 0.88);
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --accent-primary: #9b30ff;
+  --accent-primary-hover: #b15eff;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 30px -4px rgba(0, 0, 0, 0.5);
+  --cat-transporte: #94a3b8;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.25s ease, color 0.25s ease;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+/* Clean Card Surface (Nubank / Linear Subtle Border) */
+.card-surface {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card-surface:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+:root:not(.dark) .card-surface:hover {
+  border-color: rgba(15, 23, 42, 0.14);
+}
+
+/* Dropzone Animation */
+.dropzone-area {
+  border: 1.5px dashed var(--border-color);
+  transition: all 0.2s ease;
+}
+.dropzone-area.drag-over,
+.dropzone-area:hover {
+  border-color: var(--accent-primary);
+  background-color: rgba(130, 10, 209, 0.05);
+}
+
+/* Progress Bar Smooth Transition */
+.budget-progress-bar {
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+}
+
+/* ==========================================================================
+   Disposição Horizontal de Tabelas e Setores (Lado a Lado)
+   ========================================================================== */
+
+.horizontal-board-scroll {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 1.25rem;
+  overflow-x: auto;
+  padding-bottom: 0.75rem;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+}
+
+.horizontal-sector-card {
+  flex: 1 0 400px;
+  min-width: 360px;
+  max-width: 100%;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Faixa horizontal de itens dentro de cada tabela */
+.horizontal-items-strip {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding: 1rem 1.25rem;
+  scroll-behavior: smooth;
+}
+
+.horizontal-item-pill {
+  flex: 0 0 225px;
+  min-width: 210px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.85rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.horizontal-item-pill:hover {
+  border-color: rgba(155, 48, 255, 0.45);
+  transform: translateY(-1px);
+}
+
+/* Grid Horizontal de Itens Lado a Lado */
+.horizontal-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+}
+
+/* ==========================================================================
+   Visualização Compacta Agrupada por Categoria (Despesas Gabriel & Mirela)
+   ========================================================================== */
+
+.person-board-scroll-body {
+  max-height: 480px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+.compact-expense-row {
+  height: 35px;
+  max-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.76rem;
+  transition: background-color 0.12s ease;
+}
+
+.compact-expense-row:hover {
+  background-color: rgba(130, 10, 209, 0.06);
+}
+
+/* Table Styling */
+.sector-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.sector-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.sector-table td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+  font-size: 0.825rem;
+}
+
+.sector-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.sector-table tbody tr:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Category Pills */
+.badge-sector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* CTA Button */
+.cta-scan-btn {
+  background: linear-gradient(135deg, #820ad1 0%, #a82ffc 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 18px -4px rgba(130, 10, 209, 0.45);
+  transition: all 0.2s ease;
+}
+.cta-scan-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px -4px rgba(130, 10, 209, 0.6);
+}
+.cta-scan-btn:active {
+  transform: translateY(0);
+}
+
+/* Scanner Laser Effect during OCR */
+.scanner-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #a855f7, #ec4899, #a855f7, transparent);
+  box-shadow: 0 0 12px 2px rgba(168, 85, 247, 0.8);
+  animation: scanMove 2s infinite ease-in-out;
+}
+
+@keyframes scanMove {
+  0% { top: 4%; }
+  50% { top: 92%; }
+  100% { top: 4%; }
+}
+
+/* Mobile Bottom Nav Safe Padding */
+@media (max-width: 1023px) {
+  .main-content-wrapper {
+    padding-bottom: 5.5rem !important;
+  }
+}
+
+/* Print / PDF Stylesheet */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .card-surface {
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    break-inside: avoid;
+    margin-bottom: 1rem;
+  }
+  .horizontal-board-scroll {
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+  }
+  .main-content-wrapper {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+}

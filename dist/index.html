@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nosso Bolso</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cdefs%3E%3ClinearGradient id='hb' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23a855f7'/%3E%3Cstop offset='55%25' stop-color='%23820ad1'/%3E%3Cstop offset='100%25' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M24 44C24 44 5 31.8 5 18C5 11.4 10.2 6.5 16.2 6.5C19.9 6.5 22.6 8.3 24 10.8C25.4 8.3 28.1 6.5 31.8 6.5C37.8 6.5 43 11.4 43 18C43 31.8 24 44 24 44Z' fill='%234c0575'/%3E%3Ctext x='24' y='21' text-anchor='middle' font-family='Inter,Arial,sans-serif' font-weight='900' font-size='21' fill='%2334d399' stroke='%23064e3b' stroke-width='0.8'%3E$%3C/text%3E%3Cpath d='M5.3 19.2Q24 24.5 42.7 19.2C41.8 32.2 24 44 24 44C24 44 6.2 32.2 5.3 19.2Z' fill='url(%23hb)'/%3E%3Cpath d='M8.5 22.2Q24 26.8 39.5 22.2' fill='none' stroke='%23ffffff' stroke-opacity='0.75' stroke-width='1.5' stroke-dasharray='2.5 2.2' stroke-linecap='round'/%3E%3Cpath d='M9.2 23.8C11.2 32.2 24 40.3 24 40.3C24 40.3 36.8 32.2 38.8 23.8' fill='none' stroke='%23ffffff' stroke-opacity='0.55' stroke-width='1.3' stroke-dasharray='2.5 2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif']
+          },
+          colors: {
+            nubank: {
+              DEFAULT: '#820ad1',
+              dark: '#6d08b0',
+              light: '#9b30ff'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- PDF.js CDN (Extração de Texto de Faturas em PDF no Navegador) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <!-- Tesseract.js v5 CDN (OCR Local no Navegador) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Supabase JS Client v2 (Banco de Dados em Nuvem + Realtime) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="antialiased selection:bg-purple-600 selection:text-white">
+
+  <!-- Container de Notificações (Toasts) -->
+  <div id="toast-container" class="fixed bottom-20 lg:bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm"></div>
+
+  <div class="flex min-h-screen">
+
+    <!-- ====================================================================
+         BARRA LATERAL (DESKTOP)
+         ==================================================================== -->
+    <aside class="hidden lg:flex flex-col w-64 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0d1322] fixed inset-y-0 left-0 z-30 no-print">
+      <!-- Logo: Coração-Bolso com $ saindo dele -->
+      <div class="p-6 flex items-center gap-3 border-b border-slate-100 dark:border-slate-800/80">
+        <div class="w-11 h-11 shrink-0 flex items-center justify-center drop-shadow-md select-none" title="Nosso Bolso">
+          <svg class="w-11 h-11 overflow-visible" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="pocketHeartFront" x1="6" y1="18" x2="42" y2="44" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#a855f7" />
+                <stop offset="55%" stop-color="#820ad1" />
+                <stop offset="100%" stop-color="#db2777" />
+              </linearGradient>
+              <linearGradient id="pocketHeartBack" x1="6" y1="6" x2="42" y2="26" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#581c87" />
+                <stop offset="100%" stop-color="#4c0575" />
+              </linearGradient>
+              <linearGradient id="dollarPopGrad" x1="18" y1="1" x2="30" y2="24" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#6ee7b7" />
+                <stop offset="50%" stop-color="#10b981" />
+                <stop offset="100%" stop-color="#059669" />
+              </linearGradient>
+              <filter id="dollarGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" flood-color="#022c22" flood-opacity="0.55" />
+              </filter>
+            </defs>
+
+            <!-- Parte de trás do Coração (Interior do Bolso) -->
+            <path d="M24 44C24 44 5 31.8 5 18C5 11.4 10.2 6.5 16.2 6.5C19.9 6.5 22.6 8.3 24 10.8C25.4 8.3 28.1 6.5 31.8 6.5C37.8 6.5 43 11.4 43 18C43 31.8 24 44 24 44Z"
+              fill="url(#pocketHeartBack)" stroke="rgba(255,255,255,0.15)" stroke-width="1" />
+
+            <!-- Símbolo $ saindo de dentro do bolso-coração -->
+            <g filter="url(#dollarGlow)">
+              <text x="24" y="21.5" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="900" font-size="21" fill="url(#dollarPopGrad)" stroke="#ecfdf5" stroke-width="0.9">$</text>
+            </g>
+
+            <!-- Parte da frente do Bolso em formato de Coração (sobrepondo a base do $) -->
+            <path d="M5.2 19C14 23.2 34 23.2 42.8 19C41.8 32.1 24 44 24 44C24 44 6.2 32.1 5.2 19Z"
+              fill="url(#pocketHeartFront)" />
+
+            <!-- Borda superior da abertura do bolso -->
+            <path d="M5.2 19C14 23.2 34 23.2 42.8 19"
+              stroke="rgba(255,255,255,0.35)" stroke-width="1.3" stroke-linecap="round" />
+
+            <!-- Costura tracejada da boca do bolso -->
+            <path d="M8.3 22C15.5 25.4 32.5 25.4 39.7 22"
+              stroke="rgba(255,255,255,0.75)" stroke-width="1.35" stroke-dasharray="2.4 2.2" stroke-linecap="round" />
+
+            <!-- Costura tracejada contornando o bolso-coração -->
+            <path d="M8.8 23.5C10.8 32 24 40.4 24 40.4C24 40.4 37.2 32 39.2 23.5"
+              stroke="rgba(255,255,255,0.55)" stroke-width="1.25" stroke-dasharray="2.4 2.2" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="font-extrabold text-lg tracking-tight leading-none">Nosso <span class="text-purple-500">Bolso</span></h1>
+          <span class="text-[11px] text-slate-400 font-medium">Gabriel &amp; Mirela</span>
+        </div>
+      </div>
+
+      <!-- Botões Principais de Ação (Unificados na Barra Lateral) -->
+      <div class="p-4 space-y-2.5">
+        <button onclick="openScanModal()"
+          class="w-full py-3 px-4 rounded-2xl cta-scan-btn font-bold text-xs flex items-center justify-center gap-2">
+          <i data-lucide="scan-line" class="w-4 h-4 shrink-0"></i>
+          <span>+ Adicionar Print ou Fatura PDF</span>
+        </button>
+        <button onclick="openQuickManualModal('mercado', 'gabriel')"
+          class="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 transition">
+          <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i>
+          <span>Entrada Manual</span>
+        </button>
+      </div>
+
+      <!-- Links de Navegação -->
+      <nav class="flex-1 px-3 py-2 space-y-1 text-sm font-medium">
+        <button onclick="scrollToSection('top-dashboard')"
+          class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-purple-600 dark:text-purple-400 bg-purple-500/10 font-semibold transition">
+          <i data-lucide="wallet" class="w-4 h-4"></i>
+          <span>Visão Geral</span>
+        </button>
+        <button onclick="scrollToSection('section-couple-boards')"
+          class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition">
+          <i data-lucide="columns-2" class="w-4 h-4"></i>
+          <span>Despesas: Gabriel & Mirela</span>
+        </button>
+        <button onclick="scrollToSection('section-sectors')"
+          class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition">
+          <i data-lucide="layers" class="w-4 h-4"></i>
+          <span>Gastos por Setor</span>
+        </button>
+        <button onclick="scrollToSection('section-charts')"
+          class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition">
+          <i data-lucide="pie-chart" class="w-4 h-4"></i>
+          <span>Gráficos</span>
+        </button>
+        <button onclick="scrollToSection('section-subscriptions')"
+          class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition">
+          <i data-lucide="repeat" class="w-4 h-4"></i>
+          <span>Gastos Fixos</span>
+        </button>
+      </nav>
+
+      <!-- Rodapé da Barra Lateral: Tema & Configurações -->
+      <div class="p-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
+        <button onclick="toggleDarkMode()"
+          class="w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:opacity-90 transition">
+          <span class="flex items-center gap-2">
+            <i data-lucide="sun-moon" class="w-4 h-4 text-purple-500"></i>
+            <span id="theme-toggle-label">Modo Claro</span>
+          </span>
+          <span class="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-400">Tema</span>
+        </button>
+
+        <button onclick="openSettingsModal()"
+          class="w-full flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white transition">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+          <span>Configurar IA / Backup</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ====================================================================
+         CONTEÚDO PRINCIPAL
+         ==================================================================== -->
+    <main class="flex-1 lg:ml-64 main-content-wrapper p-5 sm:p-7 lg:p-9 max-w-[1600px] w-full mx-auto" id="top-dashboard">
+
+      <!-- Cabeçalho Superior Limpo: Título + Seletor de Mês + Botão Discreto Exportar -->
+      <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <svg class="w-9 h-9 lg:hidden shrink-0 overflow-visible drop-shadow" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M24 44C24 44 5 31.8 5 18C5 11.4 10.2 6.5 16.2 6.5C19.9 6.5 22.6 8.3 24 10.8C25.4 8.3 28.1 6.5 31.8 6.5C37.8 6.5 43 11.4 43 18C43 31.8 24 44 24 44Z" fill="#4c0575" />
+              <text x="24" y="21.5" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="900" font-size="21" fill="#10b981" stroke="#ecfdf5" stroke-width="0.9">$</text>
+              <path d="M5.2 19C14 23.2 34 23.2 42.8 19C41.8 32.1 24 44 24 44C24 44 6.2 32.1 5.2 19Z" fill="url(#pocketHeartFront)" />
+              <path d="M8.3 22C15.5 25.4 32.5 25.4 39.7 22" stroke="rgba(255,255,255,0.75)" stroke-width="1.35" stroke-dasharray="2.4 2.2" stroke-linecap="round" />
+              <path d="M8.8 23.5C10.8 32 24 40.4 24 40.4C24 40.4 37.2 32 39.2 23.5" stroke="rgba(255,255,255,0.55)" stroke-width="1.25" stroke-dasharray="2.4 2.2" stroke-linecap="round" />
+            </svg>
+            <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Nosso <span class="text-purple-500">Bolso</span></h2>
+            <!-- Badge de Status da Nuvem em Tempo Real -->
+            <button id="cloud-sync-badge" onclick="openSettingsModal()" type="button"
+              class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-200/80 dark:bg-slate-800/90 text-slate-500 dark:text-slate-400 border border-slate-300/60 dark:border-slate-700/70 transition no-print"
+              title="Status de Sincronização em Nuvem">
+              <span id="cloud-sync-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span id="cloud-sync-text">Verificando nuvem...</span>
+            </button>
+          </div>
+
+          <button onclick="toggleDarkMode()" class="lg:hidden p-2.5 rounded-xl card-surface no-print" title="Alternar Tema">
+            <i data-lucide="sun-moon" class="w-5 h-5 text-purple-500"></i>
+          </button>
+        </div>
+
+        <!-- Seletor de Mês/Ano + Único Botão Discreto de Exportar -->
+        <div class="flex items-center gap-3">
+          <div class="flex items-center bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/[0.08] rounded-2xl p-1 shadow-sm">
+            <button onclick="changeMonth(-1)"
+              class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+              title="Mês Anterior">
+              <i data-lucide="chevron-left" class="w-4 h-4"></i>
+            </button>
+            <div class="px-4 py-1 text-sm font-bold min-w-[140px] text-center flex items-center justify-center gap-1.5">
+              <i data-lucide="calendar" class="w-4 h-4 text-purple-500"></i>
+              <span id="current-month-label">Outubro 2026</span>
+            </div>
+            <button onclick="changeMonth(1)"
+              class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+              title="Próximo Mês">
+              <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Botão Único Discreto: Exportar (CSV / PDF) -->
+          <div class="relative no-print">
+            <button onclick="toggleExportMenu(event)"
+              class="px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20 text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2 shadow-sm transition">
+              <i data-lucide="download" class="w-4 h-4 text-slate-400"></i>
+              <span>Exportar (CSV / PDF)</span>
+            </button>
+
+            <div id="export-dropdown-menu"
+              class="hidden absolute right-0 mt-2 w-48 rounded-2xl card-surface p-1.5 shadow-xl z-40">
+              <button onclick="exportMonthCSV()"
+                class="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 transition">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-500"></i>
+                <span>Planilha Excel (CSV)</span>
+              </button>
+              <button onclick="exportPDFReport()"
+                class="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 transition">
+                <i data-lucide="printer" class="w-4 h-4 text-purple-500"></i>
+                <span>Relatório em PDF</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ==================================================================
+           AVISO AMIGÁVEL QUANDO BANCO EM NUVEM NÃO ESTÁ CONFIGURADO (.env)
+           ================================================================== -->
+      <div id="db-unconfigured-banner" class="hidden mb-6 p-4 rounded-2xl border border-amber-500/40 bg-amber-500/10 flex flex-wrap items-center justify-between gap-3 no-print">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 text-base">
+            ⚠️
+          </div>
+          <div>
+            <p id="db-unconfigured-text" class="text-xs sm:text-sm font-extrabold text-amber-400">
+              Banco de Dados não configurado. Adicione suas chaves no arquivo .env
+            </p>
+            <p class="text-[11px] sm:text-xs text-slate-400">
+              Fallback temporário ativo: seus dados estão sendo salvos no <code class="text-amber-300">localStorage</code> até que você configure o Firebase Firestore.
+            </p>
+          </div>
+        </div>
+        <button type="button" onclick="openSettingsModal()"
+          class="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shrink-0">
+          ⚙️ Configurar Banco em Nuvem
+        </button>
+      </div>
+
+      <!-- ==================================================================
+           LOADING SPINNER & SKELETON SCREEN (CARREGAMENTO DA NUVEM)
+           ================================================================== -->
+      <div id="cloud-loading-skeleton" class="hidden mb-8 p-6 rounded-2xl card-surface border border-purple-500/30 space-y-4 no-print">
+        <div class="flex items-center gap-3">
+          <div class="w-5 h-5 rounded-full border-2 border-purple-500 border-t-transparent animate-spin"></div>
+          <span id="cloud-loading-message" class="text-xs sm:text-sm font-bold text-purple-400">
+            Carregando dados em tempo real do banco de dados na nuvem...
+          </span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 animate-pulse">
+          <div class="h-24 rounded-2xl bg-slate-200/70 dark:bg-slate-800/80"></div>
+          <div class="h-24 rounded-2xl bg-slate-200/70 dark:bg-slate-800/80"></div>
+          <div class="h-24 rounded-2xl bg-slate-200/70 dark:bg-slate-800/80"></div>
+          <div class="h-24 rounded-2xl bg-slate-200/70 dark:bg-slate-800/80"></div>
+        </div>
+      </div>
+
+      <!-- ==================================================================
+           4 CARDS DO TOPO (Salário Gabriel, Salário Mirela, Renda do Casal, Maior Gasto do Mês)
+           ================================================================== -->
+      <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-10">
+
+        <!-- Salário Gabriel -->
+        <div class="card-surface p-6 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                <span>Salário Gabriel</span>
+              </span>
+              <button onclick="openIncomeModal()"
+                class="text-xs font-medium text-slate-400 hover:text-blue-400 flex items-center gap-1 no-print transition">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                <span>Editar</span>
+              </button>
+            </div>
+            <div id="card-gabriel-salary" class="text-2xl font-extrabold text-emerald-500 tracking-tight">
+              R$ 0,00
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3.5 border-t border-slate-200/60 dark:border-white/[0.06] grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span class="text-slate-400 block mb-0.5">Despesas</span>
+              <span id="card-gabriel-expenses" class="font-bold text-red-500">R$ 0,00</span>
+            </div>
+            <div class="text-right">
+              <span class="text-slate-400 block mb-0.5">Saldo Livre</span>
+              <span id="card-gabriel-balance" class="font-extrabold text-emerald-500">R$ 0,00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Salário Mirela -->
+        <div class="card-surface p-6 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-pink-500"></span>
+                <span>Salário Mirela</span>
+              </span>
+              <button onclick="openIncomeModal()"
+                class="text-xs font-medium text-slate-400 hover:text-pink-400 flex items-center gap-1 no-print transition">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                <span>Editar</span>
+              </button>
+            </div>
+            <div id="card-mirela-salary" class="text-2xl font-extrabold text-emerald-500 tracking-tight">
+              R$ 0,00
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3.5 border-t border-slate-200/60 dark:border-white/[0.06] grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span class="text-slate-400 block mb-0.5">Despesas</span>
+              <span id="card-mirela-expenses" class="font-bold text-red-500">R$ 0,00</span>
+            </div>
+            <div class="text-right">
+              <span class="text-slate-400 block mb-0.5">Saldo Livre</span>
+              <span id="card-mirela-balance" class="font-extrabold text-emerald-500">R$ 0,00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Renda do Casal -->
+        <div class="card-surface p-6 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                <span>Renda do Casal</span>
+              </span>
+            </div>
+            <div id="card-couple-income" class="text-2xl font-extrabold text-emerald-500 tracking-tight">
+              R$ 0,00
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3.5 border-t border-slate-200/60 dark:border-white/[0.06] grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span class="text-slate-400 block mb-0.5">Gastos Totais</span>
+              <span id="card-couple-expense" class="font-bold text-red-500">R$ 0,00</span>
+            </div>
+            <div class="text-right">
+              <span class="text-slate-400 block mb-0.5">Saldo Restante</span>
+              <span id="card-couple-balance" class="text-base font-extrabold text-emerald-500">R$ 0,00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Maior Gasto do Mês -->
+        <div class="card-surface p-6 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>Maior Gasto do Mês</span>
+              </span>
+              <button onclick="clearCurrentMonthData()" class="text-[11px] text-slate-400 hover:text-red-500 no-print transition">
+                Limpar Mês
+              </button>
+            </div>
+            <div id="card-villain-title" class="text-lg font-extrabold text-slate-900 dark:text-white truncate">
+              Sem gastos no mês
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3.5 border-t border-slate-200/60 dark:border-white/[0.06]">
+            <p id="card-villain-desc" class="text-xs text-slate-400 truncate">
+              Adicione um print (OCR) ou registre um gasto manual
+            </p>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ==================================================================
+           DESPESAS: GABRIEL & MIRELA (AGRUPADAS POR CATEGORIA + LINHAS ULTRA-COMPACTAS)
+           ================================================================== -->
+      <section id="section-couple-boards" class="mb-10">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 class="text-lg sm:text-xl font-extrabold tracking-tight">Despesas: Gabriel &amp; Mirela</h2>
+
+          <div class="flex flex-wrap items-center gap-2 no-print">
+            <button onclick="clearCurrentMonthData()"
+              class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-red-500/15 hover:bg-red-500/25 text-red-500 border border-red-500/30 transition flex items-center gap-1.5">
+              <span>🧹 Zerar Todos os Gastos do Mês</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="couple-horizontal-boards" class="flex flex-col lg:flex-row items-stretch gap-6"></div>
+      </section>
+
+      <!-- ==================================================================
+           GASTOS POR SETOR (HORIZONTAL LADO A LADO)
+           ================================================================== -->
+      <section id="section-sectors" class="mb-10">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <h2 class="text-lg sm:text-xl font-extrabold tracking-tight">Gastos por Setor</h2>
+        </div>
+
+        <div id="sector-tabs-bar" class="flex flex-wrap items-center gap-2 mb-4 no-print"></div>
+
+        <div id="sector-tables-container" class="horizontal-board-scroll"></div>
+      </section>
+
+      <!-- ==================================================================
+           GRÁFICOS INTERATIVOS (Donut Setorial + Barras Gabriel vs Mirela / Mês Anterior)
+           ================================================================== -->
+      <section id="section-charts" class="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-8">
+        <div class="card-surface p-5 sm:p-6 lg:col-span-5 flex flex-col">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-base">Proporção por Setor</h3>
+              <p class="text-xs text-slate-400">Distribuição dos gastos combinados do mês</p>
+            </div>
+            <span class="p-2 rounded-xl bg-purple-500/10 text-purple-500">
+              <i data-lucide="pie-chart" class="w-4 h-4"></i>
+            </span>
+          </div>
+          <div class="relative flex-1 min-h-[250px]">
+            <canvas id="sectorDonutChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card-surface p-5 sm:p-6 lg:col-span-7 flex flex-col">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h3 class="font-bold text-base">Comparativo Horizontal por Setor</h3>
+              <p class="text-xs text-slate-400">Despesas Gabriel vs. Mirela ou Comparativo com o Mês Anterior</p>
+            </div>
+            <div class="flex items-center gap-1.5 no-print">
+              <button id="btn-chart-daily" onclick="setBarChartMode('daily')"
+                class="px-3 py-1 rounded-lg text-xs font-semibold bg-purple-700 text-white transition">
+                Gabriel vs. Mirela
+              </button>
+              <button id="btn-chart-compare" onclick="setBarChartMode('compare')"
+                class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition">
+                Vs. Mês Anterior
+              </button>
+            </div>
+          </div>
+          <div class="relative flex-1 min-h-[250px]">
+            <canvas id="evolutionBarChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================================
+           SEÇÃO DE ASSINATURAS E GASTOS FIXOS RECORRENTES
+           ================================================================== -->
+      <section id="section-subscriptions" class="card-surface p-5 sm:p-6 mb-10 overflow-hidden">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-lg font-extrabold">🔄 Assinaturas e Gastos Fixos Recorrentes</h3>
+              <span id="subscriptions-total-badge"
+                class="px-3 py-0.5 rounded-full text-xs font-bold bg-purple-500/15 text-purple-500">
+                Total Fixo: R$ 0,00
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Cobranças fixas lançadas automaticamente todo mês.
+            </p>
+          </div>
+        </div>
+
+        <form id="subscription-form" onsubmit="addSubscription(event)" class="flex flex-wrap items-center gap-2.5 my-4 w-full box-border no-print">
+          <input id="sub-merchant" type="text" required placeholder="Nome da despesa fixa..."
+            class="flex-1 min-w-[180px] px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+
+          <select id="sub-owner"
+            class="w-full sm:w-auto min-w-[115px] px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <option value="gabriel">👦 Gabriel</option>
+            <option value="mirela">👩 Mirela</option>
+            <option value="casal">💑 Casal</option>
+          </select>
+
+          <input id="sub-amount" type="number" step="0.01" min="0.01" required placeholder="Valor (R$)"
+            class="flex-1 sm:flex-initial sm:w-32 min-w-[110px] px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+
+          <input id="sub-day" type="number" min="1" max="28" required placeholder="Dia" value="5" title="Dia do vencimento (1 a 28)"
+            class="w-[75px] max-w-[80px] px-2.5 py-2 rounded-xl text-xs text-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+
+          <select id="sub-sector"
+            class="w-full sm:w-auto min-w-[150px] px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <option value="mercado">🏠 Casa & Mercado</option>
+            <option value="compras">💳 Cartões & Compras</option>
+            <option value="delivery">🍔 Delivery</option>
+            <option value="transporte">🚗 Transporte</option>
+            <option value="saude">💊 Saúde</option>
+          </select>
+
+          <select id="sub-payment"
+            class="w-full sm:w-auto min-w-[110px] px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <option value="PIX">⚡ PIX</option>
+            <option value="Cartão de Crédito">💳 Crédito</option>
+            <option value="Cartão de Débito">🏦 Débito</option>
+          </select>
+
+          <div class="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
+            <button id="sub-submit-btn" type="submit"
+              class="px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold shrink-0 whitespace-nowrap transition">
+              + Fixar
+            </button>
+            <button id="sub-cancel-btn" type="button" onclick="cancelSubscriptionEdit()"
+              class="hidden px-3 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shrink-0 whitespace-nowrap transition">
+              Cancelar
+            </button>
+          </div>
+        </form>
+
+        <div class="overflow-x-auto">
+          <table class="sector-table">
+            <thead>
+              <tr>
+                <th>Dia</th>
+                <th>Responsável & Despesa Fixa</th>
+                <th>Setor</th>
+                <th>Pagamento</th>
+                <th class="text-right">Valor Mensal</th>
+                <th class="text-right no-print">Status / Ação</th>
+              </tr>
+            </thead>
+            <tbody id="subscriptions-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ====================================================================
+       MENU INFERIOR RÁPIDO (MOBILE)
+       ==================================================================== -->
+  <nav class="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 z-40 px-3 py-2 flex items-center justify-around no-print">
+    <button onclick="scrollToSection('top-dashboard')" class="flex flex-col items-center gap-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+      <i data-lucide="wallet" class="w-5 h-5"></i>
+      <span>Salários</span>
+    </button>
+    <button onclick="openQuickManualModal('mercado', 'gabriel')" class="flex flex-col items-center gap-0.5 text-xs font-medium text-amber-500">
+      <i data-lucide="zap" class="w-5 h-5"></i>
+      <span>Manual</span>
+    </button>
+
+    <button onclick="openScanModal()"
+      class="-mt-7 px-5 py-3 rounded-2xl cta-scan-btn font-bold text-xs flex items-center gap-1.5 shadow-xl">
+      <i data-lucide="scan-line" class="w-5 h-5"></i>
+      <span>+ Print</span>
+    </button>
+
+    <button onclick="scrollToSection('section-couple-boards')" class="flex flex-col items-center gap-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+      <i data-lucide="columns-2" class="w-5 h-5"></i>
+      <span>Casal</span>
+    </button>
+    <button onclick="scrollToSection('section-sectors')" class="flex flex-col items-center gap-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+      <i data-lucide="layers" class="w-5 h-5"></i>
+      <span>Setores</span>
+    </button>
+  </nav>
+
+  <!-- ====================================================================
+       MODAL PRINCIPAL: LEITOR DE PRINTS (OCR) + CONFIRMAÇÃO RÁPIDA
+       ==================================================================== -->
+  <div id="scan-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+    <div class="card-surface w-full max-w-xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[92vh] flex flex-col">
+
+      <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-purple-600/15 text-purple-500 flex items-center justify-center">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base">+ Adicionar Print ou Fatura PDF</h3>
+            <p class="text-xs text-slate-400">Envie Faturas PDF (Bradesco Cartões, etc.) ou prints do iFood, Uber, PIX e Notas</p>
+          </div>
+        </div>
+        <button onclick="closeScanModal()" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-5">
+
+        <!-- ETAPA 1: UPLOAD -->
+        <div id="scan-step-upload" class="space-y-5">
+          <label id="receipt-dropzone" for="receipt-file-input"
+            class="dropzone-area rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer">
+            <div class="w-14 h-14 rounded-2xl bg-purple-600/15 text-purple-500 flex items-center justify-center mb-3">
+              <i data-lucide="file-up" class="w-7 h-7"></i>
+            </div>
+            <p class="font-bold text-sm sm:text-base">
+              Arraste o Print ou Fatura PDF aqui, clique para escolher ou pressione <kbd class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono text-xs">Ctrl+V</kbd>
+            </p>
+            <p class="text-xs text-slate-400 mt-1">
+              Suporta <strong>PDF de Fatura (Bradesco Cartões, etc.)</strong> e Imagens (PNG, JPG, WebP) com classificação automática e revisão interativa
+            </p>
+            <input id="receipt-file-input" type="file" accept="image/*,application/pdf,.pdf" class="hidden" />
+          </label>
+
+          <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/70">
+            <div class="flex items-center justify-between mb-2.5">
+              <span class="text-xs font-bold uppercase tracking-wider text-purple-500 flex items-center gap-1.5">
+                <i data-lucide="wand-2" class="w-3.5 h-3.5"></i>
+                <span>Testar leitor com fatura ou comprovante de exemplo:</span>
+              </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
+              <button type="button" onclick="triggerDemoReceiptOCR('fatura_bradesco')"
+                class="px-2.5 py-2 rounded-xl text-xs font-bold bg-purple-600/15 text-purple-500 hover:border-purple-500 border border-purple-500/30 transition text-center">
+                📄 Fatura Bradesco
+              </button>
+              <button type="button" onclick="triggerDemoReceiptOCR('ifood')"
+                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-red-500 border border-slate-200 dark:border-slate-700 transition text-center">
+                🍔 Print iFood
+              </button>
+              <button type="button" onclick="triggerDemoReceiptOCR('uber')"
+                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-slate-400 border border-slate-200 dark:border-slate-700 transition text-center">
+                🚗 Print Uber
+              </button>
+              <button type="button" onclick="triggerDemoReceiptOCR('mercado')"
+                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-emerald-500 border border-slate-200 dark:border-slate-700 transition text-center">
+                🛒 PIX Mercado
+              </button>
+              <button type="button" onclick="triggerDemoReceiptOCR('compras')"
+                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-purple-500 border border-slate-200 dark:border-slate-700 transition text-center">
+                🛍️ Mercado Livre
+              </button>
+              <button type="button" onclick="triggerDemoReceiptOCR('saude')"
+                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-cyan-500 border border-slate-200 dark:border-slate-700 transition text-center">
+                💊 Farmácia
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-2">
+            <button type="button" onclick="openQuickManualModal('mercado', 'gabriel')"
+              class="text-xs font-semibold text-purple-500 hover:underline flex items-center gap-1">
+              <i data-lucide="keyboard" class="w-3.5 h-3.5"></i>
+              <span>Prefere digitar manualmente sem print? Clique aqui</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ETAPA 2: PROCESSAMENTO DO OCR -->
+        <div id="scan-step-processing" class="hidden py-6 flex flex-col items-center text-center space-y-4">
+          <div class="relative w-44 h-56 rounded-2xl overflow-hidden border-2 border-purple-500 shadow-lg bg-slate-900">
+            <img id="scan-processing-img" src="" alt="Processando Print" class="w-full h-full object-cover opacity-75" />
+            <div class="scanner-line"></div>
+          </div>
+          <div class="w-full max-w-sm space-y-2">
+            <div class="text-sm font-bold text-purple-400" id="ocr-progress-status">
+              Extraindo dados do comprovante...
+            </div>
+            <div class="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div id="ocr-progress-bar" class="h-full bg-purple-600 transition-all duration-300" style="width: 20%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ETAPA 3: TELA DE CONFIRMAÇÃO RÁPIDA -->
+        <form id="scan-step-confirm" onsubmit="saveConfirmedTransaction(event)" class="hidden space-y-4">
+
+          <div id="duplicate-alert-banner"
+            class="hidden p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-600 dark:text-amber-300 text-xs flex items-start gap-2.5">
+            <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0 text-amber-500"></i>
+            <div>
+              <strong class="font-bold block text-sm">Parece que você já registrou essa compra!</strong>
+              <span>Encontramos um lançamento com o mesmo valor, data e estabelecimento neste mês.</span>
+            </div>
+          </div>
+
+          <div id="confirm-thumb-wrapper" class="flex items-center gap-3.5 p-3 rounded-xl bg-slate-100 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
+            <img id="confirm-receipt-thumb" src="" alt="Miniatura do Comprovante"
+              class="w-14 h-16 object-cover rounded-lg border border-slate-300 dark:border-slate-600 shrink-0" />
+            <div class="flex-1 min-w-0">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-500">
+                ✓ Leitura Concluída
+              </span>
+              <p class="text-xs text-slate-500 dark:text-slate-300 mt-1">
+                Confira os dados extraídos abaixo e selecione de quem é a despesa.
+              </p>
+            </div>
+            <button type="button" onclick="openScanModal()"
+              class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-slate-700">
+              Trocar Print
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <!-- Responsável pela Despesa (Gabriel ou Mirela) -->
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                De quem é esta despesa? *
+              </label>
+              <select id="confirm-owner" onchange="validateDuplicateOnConfirmForm()"
+                class="w-full px-3.5 py-2.5 rounded-xl text-sm font-bold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <option value="gabriel">👦 Despesas Gabriel</option>
+                <option value="mirela">👩 Despesas Mirela</option>
+                <option value="casal">💑 Ambos / Casal</option>
+              </select>
+            </div>
+
+            <!-- Valor Total -->
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                1. Valor Total (R$) *
+              </label>
+              <input id="confirm-amount" type="number" step="0.01" min="0.01" required
+                oninput="validateDuplicateOnConfirmForm()"
+                placeholder="Ex: 45.90"
+                class="w-full px-3.5 py-2.5 rounded-xl text-base font-extrabold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            </div>
+
+            <!-- Nome do Estabelecimento / Despesa -->
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                2. Nome da Despesa / Estabelecimento *
+              </label>
+              <input id="confirm-merchant" type="text" required
+                oninput="autoClassifyConfirmMerchant(this.value)"
+                placeholder="Ex: Apartamento, Nubank, iFood, Uber..."
+                class="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            </div>
+
+            <!-- Data -->
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                3. Data *
+              </label>
+              <input id="confirm-date" type="date" required
+                onchange="validateDuplicateOnConfirmForm()"
+                class="w-full px-3.5 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700" />
+            </div>
+
+            <!-- Hora -->
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                Hora
+              </label>
+              <input id="confirm-time" type="time"
+                class="w-full px-3.5 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700" />
+            </div>
+
+            <!-- Categoria Sugerida -->
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                4. Categoria / Setor *
+              </label>
+              <select id="confirm-sector"
+                class="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
+                <option value="mercado">🏠 Mercado, Casa & Contas</option>
+                <option value="compras">💳 Cartões, Bancos & Compras</option>
+                <option value="delivery">🍔 Delivery & Alimentação</option>
+                <option value="transporte">🚗 Transporte & Mobilidade</option>
+                <option value="saude">💊 Saúde & Cuidados</option>
+              </select>
+            </div>
+
+            <!-- Forma de Pagamento -->
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                5. Forma de Pagamento *
+              </label>
+              <select id="confirm-payment"
+                class="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
+                <option value="PIX">⚡ PIX</option>
+                <option value="Cartão de Crédito">💳 Cartão de Crédito</option>
+                <option value="Cartão de Débito">🏦 Cartão de Débito</option>
+                <option value="Vale-Refeição">🍽️ Vale-Refeição</option>
+                <option value="Dinheiro">💵 Dinheiro</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <button type="button" onclick="closeScanModal()"
+              class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              Cancelar
+            </button>
+            <button type="submit"
+              class="px-6 py-2.5 rounded-xl cta-scan-btn text-xs sm:text-sm font-bold flex items-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+              <span>Confirmar Lançamento</span>
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       MODAL DE SALÁRIOS DO MÊS (GABRIEL + MIRELA + SOMA DO CASAL)
+       ==================================================================== -->
+  <div id="income-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+    <form onsubmit="saveMonthlyIncome(event)" class="card-surface w-full max-w-md p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-extrabold text-base">💰 Salários de <span id="income-modal-month"></span></h3>
+        <button type="button" onclick="document.getElementById('income-modal').classList.add('hidden')" class="text-slate-400">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <p class="text-xs text-slate-400">
+        Defina abaixo os salários de Gabriel e Mirela para o mês selecionado:
+      </p>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-blue-500 mb-1">
+            👦 1. Salário Gabriel (R$)
+          </label>
+          <input id="income-gabriel-input" type="number" step="0.01" min="0"
+            oninput="updateIncomeModalSumPreview()"
+            placeholder="Ex: 3872.00"
+            class="w-full px-4 py-2.5 rounded-xl text-base font-extrabold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-pink-500 mb-1">
+            👩 2. Salário Mirela (R$)
+          </label>
+          <input id="income-mirela-input" type="number" step="0.01" min="0"
+            oninput="updateIncomeModalSumPreview()"
+            placeholder="Ex: 3095.00"
+            class="w-full px-4 py-2.5 rounded-xl text-base font-extrabold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700" />
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-between">
+          <span class="text-xs font-bold text-purple-400">💑 3. Salário dos 2 Juntos:</span>
+          <span id="income-modal-couple-sum" class="text-lg font-extrabold text-emerald-500">R$ 0,00</span>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="document.getElementById('income-modal').classList.add('hidden')"
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-800">Cancelar</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">
+          Salvar Salários do Mês
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ====================================================================
+       MODAL DE TETO DE GASTOS POR SETOR
+       ==================================================================== -->
+  <div id="budget-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+    <form onsubmit="saveSectorBudget(event)" class="card-surface w-full max-w-md p-6 space-y-4">
+      <input id="budget-modal-sector-id" type="hidden" />
+      <div class="flex items-center justify-between">
+        <h3 id="budget-modal-title" class="font-extrabold text-base">Definir Teto de Gastos</h3>
+        <button type="button" onclick="document.getElementById('budget-modal').classList.add('hidden')" class="text-slate-400">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <p class="text-xs text-slate-400">
+        A barra do setor ficará <strong>Verde</strong> até 79%, <strong>Amarela</strong> ao atingir 80% e <strong>Vermelha</strong> ao atingir 100%.
+      </p>
+      <input id="budget-modal-input" type="number" step="1" min="10" required
+        class="w-full px-4 py-2.5 rounded-xl text-lg font-extrabold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700" />
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="document.getElementById('budget-modal').classList.add('hidden')"
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-800">Cancelar</button>
+        <button type="submit" class="px-5 py-2 rounded-xl cta-scan-btn text-xs font-bold">
+          Salvar Limite
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ====================================================================
+       MODAL DE CONFIGURAÇÕES (BANCO EM NUVEM FIREBASE + API GEMINI + BACKUP)
+       ==================================================================== -->
+  <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+    <div class="card-surface w-full max-w-xl p-6 space-y-5 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+        <h3 class="font-extrabold text-base flex items-center gap-2">
+          <i data-lucide="settings" class="w-5 h-5 text-purple-500"></i>
+          <span>Configurações de Banco em Nuvem, IA &amp; Backup</span>
+        </h3>
+        <button type="button" onclick="document.getElementById('settings-modal').classList.add('hidden')" class="text-slate-400">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form onsubmit="saveSettingsModal(event)" class="space-y-4">
+        <!-- Seção 1: Chaves do Supabase (Banco de Dados em Nuvem em Tempo Real) -->
+        <div class="p-4 rounded-xl bg-slate-100/90 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/70 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">
+              ⚡ 1. Supabase (Sincronização PC &amp; Celular em Tempo Real)
+            </span>
+            <span class="text-[11px] text-slate-400">Variáveis <code class="text-emerald-300">.env</code></span>
+          </div>
+
+          <div class="space-y-2.5">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 mb-1">VITE_SUPABASE_URL (Project URL)</label>
+              <input id="settings-sb-url" type="text" placeholder="https://xyzcompany.supabase.co"
+                class="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 mb-1">VITE_SUPABASE_ANON_KEY (Project API Anon Key)</label>
+              <input id="settings-sb-anon-key" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                class="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700" />
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <span class="text-[11px] text-slate-400">
+              Tabelas: <code>meses</code>, <code>salarios</code>, <code>despesas</code>, <code>gastos_fixos</code>
+            </span>
+            <button type="button" onclick="forceSyncLocalToCloud()"
+              class="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 transition">
+              ☁️ Enviar Dados Locais p/ Nuvem
+            </button>
+          </div>
+        </div>
+
+        <!-- Seção 2: Chave Gemini OCR -->
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+            🤖 2. Chave Google Gemini API (Opcional - Visão Computacional IA)
+          </label>
+          <input id="settings-gemini-key" type="password" placeholder="AIzaSy... (Deixe em branco para usar OCR Local Gratuito)"
+            class="w-full px-3.5 py-2 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700" />
+        </div>
+
+        <!-- Seção 3: Backup JSON -->
+        <div class="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/60 space-y-2.5">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-400">💾 3. Backup Manual (.JSON)</div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" onclick="exportBackupJSON()"
+              class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-purple-600 text-white hover:bg-purple-500 transition flex items-center gap-1.5">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Baixar Backup (.JSON)</span>
+            </button>
+
+            <label class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-700 cursor-pointer hover:opacity-90 transition flex items-center gap-1.5">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+              <span>Restaurar Backup</span>
+              <input type="file" accept=".json" onchange="importBackupJSON(event)" class="hidden" />
+            </label>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="submit" class="px-5 py-2 rounded-xl cta-scan-btn text-xs font-bold">
+            Salvar e Conectar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       MODAL POP-UP DE REVISÃO INTERATIVA DA FATURA PDF / CARTÃO DE CRÉDITO
+       ==================================================================== -->
+  <div id="invoice-review-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-sm">
+    <div class="card-surface w-full max-w-5xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[94vh] flex flex-col">
+
+      <!-- Cabeçalho do Pop-up de Revisão da Fatura -->
+      <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-purple-600/15 text-purple-500 flex items-center justify-center font-extrabold text-lg">
+            📄
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-extrabold text-base sm:text-lg">Revisão Inteligente da Fatura de Cartão</h3>
+              <span id="invoice-review-holder-badge"
+                class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                Titular: GABRIEL GODOY LIMA
+              </span>
+            </div>
+            <p class="text-xs text-slate-400">
+              SALDO ANTERIOR e PAGTO. POR DEB EM C/C foram ignorados automaticamente. Revise os itens abaixo antes de lançar.
+            </p>
+          </div>
+        </div>
+
+        <button type="button" onclick="closeInvoiceReviewModal()"
+          class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Barra de Resumo Dinâmico da Fatura -->
+      <div class="px-6 py-3 bg-slate-100/80 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex flex-wrap items-center gap-4">
+          <div>
+            <span class="text-slate-400">Selecionados:</span>
+            <strong id="invoice-review-selected-count" class="ml-1 font-extrabold text-slate-900 dark:text-white">0 itens</strong>
+          </div>
+          <div>
+            <span class="text-slate-400">Total a Lançar:</span>
+            <strong id="invoice-review-selected-total" class="ml-1 text-sm font-extrabold text-red-500">R$ 0,00</strong>
+          </div>
+          <div id="invoice-review-reversal-badge" class="hidden px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 font-semibold">
+            🔄 Estornos abatidos automaticamente
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="inline-flex items-center gap-1.5 cursor-pointer select-none px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+            <input id="invoice-group-fees-checkbox" type="checkbox" onchange="toggleInvoiceGroupFees(this.checked)" class="accent-purple-600 rounded" />
+            <span class="font-semibold">Agrupar Taxas/IOF/Encargos em 1 item</span>
+          </label>
+          <button type="button" onclick="toggleAllInvoiceItems(true)"
+            class="px-2.5 py-1 rounded-lg font-semibold bg-slate-200 dark:bg-slate-800 hover:opacity-90">
+            Marcar Todos
+          </button>
+          <button type="button" onclick="toggleAllInvoiceItems(false)"
+            class="px-2.5 py-1 rounded-lg font-semibold bg-slate-200 dark:bg-slate-800 hover:opacity-90">
+            Desmarcar Todos
+          </button>
+        </div>
+      </div>
+
+      <!-- Corpo Rolável com as 2 Seções: 1. Revisão Necessária (Topo) | 2. Já Classificados Automaticamente -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-1">
+
+        <!-- 1. DESTAQUE NO TOPO: ITENS QUE PRECISAM DA SUA CLASSIFICAÇÃO (⚠️ REVISÃO NECESSÁRIA) -->
+        <div id="invoice-needs-review-section" class="rounded-2xl border-2 border-amber-500/40 bg-amber-500/[0.06] p-4 sm:p-5 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-amber-500 text-slate-950">
+                ⚠️ Revisão Necessária
+              </span>
+              <h4 class="font-extrabold text-sm sm:text-base text-amber-500">
+                Itens que precisam da sua classificação (<span id="invoice-needs-review-count">0</span>)
+              </h4>
+            </div>
+            <span class="text-xs text-slate-400">
+              Escolha o Setor, de quem é o gasto (Gabriel, Mirela ou Casal 50/50) ou renomeie para facilitar a identificação
+            </span>
+          </div>
+
+          <div id="invoice-needs-review-list" class="space-y-2.5"></div>
+        </div>
+
+        <!-- 2. LISTA: ITENS JÁ CLASSIFICADOS AUTOMATICAMENTE -->
+        <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 p-4 sm:p-5 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                ✓ Classificados Automaticamente
+              </span>
+              <h4 class="font-extrabold text-sm sm:text-base">
+                Itens reconhecidos por categoria (<span id="invoice-auto-classified-count">0</span>)
+              </h4>
+            </div>
+            <span class="text-xs text-slate-400">
+              Uber, 99, Bilhete Único, iFood, Mercados, Farmácias, Compras e Taxas — você também pode editar qualquer item
+            </span>
+          </div>
+
+          <div id="invoice-auto-classified-list" class="space-y-2"></div>
+        </div>
+
+      </div>
+
+      <!-- Rodapé Fixo com Botão Final de Confirmação -->
+      <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap items-center justify-between gap-3">
+        <div class="text-xs text-slate-400">
+          Forma de pagamento aplicada: <strong class="text-slate-700 dark:text-slate-200">💳 Cartão de Crédito</strong> • Gastos marcados como <strong>Casal</strong> são divididos 50/50 automaticamente.
+        </div>
+        <div class="flex items-center gap-2.5 ml-auto">
+          <button type="button" onclick="closeInvoiceReviewModal()"
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+            Cancelar
+          </button>
+          <button type="button" onclick="confirmAndSaveInvoiceItems()"
+            class="px-6 py-2.5 rounded-xl cta-scan-btn text-xs sm:text-sm font-extrabold flex items-center gap-2 shadow-lg">
+            <span>💾 Confirmar e Lançar nas Despesas</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       LIGHTBOX PARA VISUALIZAR O PRINT ORIGINAL ANEXADO
+       ==================================================================== -->
+  <div id="receipt-lightbox" onclick="closeReceiptLightbox()"
+    class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+    <div class="max-w-lg w-full flex flex-col items-center" onclick="event.stopPropagation()">
+      <div class="w-full flex items-center justify-between text-white mb-3">
+        <span id="lightbox-caption" class="text-xs sm:text-sm font-bold truncate">Comprovante</span>
+        <button onclick="closeReceiptLightbox()" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <img id="lightbox-img" src="" alt="Print Original"
+        class="max-h-[80vh] w-auto rounded-2xl shadow-2xl border border-white/15 object-contain bg-white" />
+    </div>
+  </div>
+
+  <!-- Scripts da Aplicação (env-local.js é local e ignorado no .gitignore para segurança da chave API) -->
+  <script src="env-local.js"></script>
+  <script src="env-config.js"></script>
+  <script type="module" src="src/lib/supabase.js"></script>
+  <script src="ocr-engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

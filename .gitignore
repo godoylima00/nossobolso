@@ -5,7 +5,3 @@ node_modules
 !.env.example
 env-local.js
 .DS_Store
-dist/
-dist
-build/
-build

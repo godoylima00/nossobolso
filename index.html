@@ -36,6 +36,9 @@
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
+  <!-- PDF.js CDN (Extração de Texto de Faturas em PDF no Navegador) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
   <!-- Tesseract.js v5 CDN (OCR Local no Navegador) -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
@@ -116,8 +119,8 @@
       <div class="p-4 space-y-2.5">
         <button onclick="openScanModal()"
           class="w-full py-3 px-4 rounded-2xl cta-scan-btn font-bold text-xs flex items-center justify-center gap-2">
-          <i data-lucide="scan-line" class="w-4 h-4"></i>
-          <span>+ Adicionar Print (OCR)</span>
+          <i data-lucide="scan-line" class="w-4 h-4 shrink-0"></i>
+          <span>+ Adicionar Print ou Fatura PDF</span>
         </button>
         <button onclick="openQuickManualModal('mercado', 'gabriel')"
           class="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 transition">
@@ -562,8 +565,8 @@
             <i data-lucide="sparkles" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="font-extrabold text-base">Leitor Inteligente de Comprovantes (OCR)</h3>
-            <p class="text-xs text-slate-400">Envie, arraste ou cole (Ctrl+V) o print do iFood, Uber, PIX ou Nota</p>
+            <h3 class="font-extrabold text-base">+ Adicionar Print ou Fatura PDF</h3>
+            <p class="text-xs text-slate-400">Envie Faturas PDF (Bradesco Cartões, etc.) ou prints do iFood, Uber, PIX e Notas</p>
           </div>
         </div>
         <button onclick="closeScanModal()" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
@@ -578,25 +581,29 @@
           <label id="receipt-dropzone" for="receipt-file-input"
             class="dropzone-area rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer">
             <div class="w-14 h-14 rounded-2xl bg-purple-600/15 text-purple-500 flex items-center justify-center mb-3">
-              <i data-lucide="upload-cloud" class="w-7 h-7"></i>
+              <i data-lucide="file-up" class="w-7 h-7"></i>
             </div>
             <p class="font-bold text-sm sm:text-base">
-              Arraste o print aqui, clique para abrir a galeria ou pressione <kbd class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono text-xs">Ctrl+V</kbd>
+              Arraste o Print ou Fatura PDF aqui, clique para escolher ou pressione <kbd class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono text-xs">Ctrl+V</kbd>
             </p>
             <p class="text-xs text-slate-400 mt-1">
-              Reconhece automaticamente Valor, Data, Hora, Estabelecimento, Categoria e Forma de Pagamento
+              Suporta <strong>PDF de Fatura (Bradesco Cartões, etc.)</strong> e Imagens (PNG, JPG, WebP) com classificação automática e revisão interativa
             </p>
-            <input id="receipt-file-input" type="file" accept="image/*" class="hidden" />
+            <input id="receipt-file-input" type="file" accept="image/*,application/pdf,.pdf" class="hidden" />
           </label>
 
           <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/70">
             <div class="flex items-center justify-between mb-2.5">
               <span class="text-xs font-bold uppercase tracking-wider text-purple-500 flex items-center gap-1.5">
                 <i data-lucide="wand-2" class="w-3.5 h-3.5"></i>
-                <span>Testar leitor OCR com comprovante gerado:</span>
+                <span>Testar leitor com fatura ou comprovante de exemplo:</span>
               </span>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
+              <button type="button" onclick="triggerDemoReceiptOCR('fatura_bradesco')"
+                class="px-2.5 py-2 rounded-xl text-xs font-bold bg-purple-600/15 text-purple-500 hover:border-purple-500 border border-purple-500/30 transition text-center">
+                📄 Fatura Bradesco
+              </button>
               <button type="button" onclick="triggerDemoReceiptOCR('ifood')"
                 class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-red-500 border border-slate-200 dark:border-slate-700 transition text-center">
                 🍔 Print iFood
@@ -903,6 +910,133 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       MODAL POP-UP DE REVISÃO INTERATIVA DA FATURA PDF / CARTÃO DE CRÉDITO
+       ==================================================================== -->
+  <div id="invoice-review-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-sm">
+    <div class="card-surface w-full max-w-5xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[94vh] flex flex-col">
+
+      <!-- Cabeçalho do Pop-up de Revisão da Fatura -->
+      <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-purple-600/15 text-purple-500 flex items-center justify-center font-extrabold text-lg">
+            📄
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-extrabold text-base sm:text-lg">Revisão Inteligente da Fatura de Cartão</h3>
+              <span id="invoice-review-holder-badge"
+                class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                Titular: GABRIEL GODOY LIMA
+              </span>
+            </div>
+            <p class="text-xs text-slate-400">
+              SALDO ANTERIOR e PAGTO. POR DEB EM C/C foram ignorados automaticamente. Revise os itens abaixo antes de lançar.
+            </p>
+          </div>
+        </div>
+
+        <button type="button" onclick="closeInvoiceReviewModal()"
+          class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Barra de Resumo Dinâmico da Fatura -->
+      <div class="px-6 py-3 bg-slate-100/80 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex flex-wrap items-center gap-4">
+          <div>
+            <span class="text-slate-400">Selecionados:</span>
+            <strong id="invoice-review-selected-count" class="ml-1 font-extrabold text-slate-900 dark:text-white">0 itens</strong>
+          </div>
+          <div>
+            <span class="text-slate-400">Total a Lançar:</span>
+            <strong id="invoice-review-selected-total" class="ml-1 text-sm font-extrabold text-red-500">R$ 0,00</strong>
+          </div>
+          <div id="invoice-review-reversal-badge" class="hidden px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 font-semibold">
+            🔄 Estornos abatidos automaticamente
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="inline-flex items-center gap-1.5 cursor-pointer select-none px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+            <input id="invoice-group-fees-checkbox" type="checkbox" onchange="toggleInvoiceGroupFees(this.checked)" class="accent-purple-600 rounded" />
+            <span class="font-semibold">Agrupar Taxas/IOF/Encargos em 1 item</span>
+          </label>
+          <button type="button" onclick="toggleAllInvoiceItems(true)"
+            class="px-2.5 py-1 rounded-lg font-semibold bg-slate-200 dark:bg-slate-800 hover:opacity-90">
+            Marcar Todos
+          </button>
+          <button type="button" onclick="toggleAllInvoiceItems(false)"
+            class="px-2.5 py-1 rounded-lg font-semibold bg-slate-200 dark:bg-slate-800 hover:opacity-90">
+            Desmarcar Todos
+          </button>
+        </div>
+      </div>
+
+      <!-- Corpo Rolável com as 2 Seções: 1. Revisão Necessária (Topo) | 2. Já Classificados Automaticamente -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-1">
+
+        <!-- 1. DESTAQUE NO TOPO: ITENS QUE PRECISAM DA SUA CLASSIFICAÇÃO (⚠️ REVISÃO NECESSÁRIA) -->
+        <div id="invoice-needs-review-section" class="rounded-2xl border-2 border-amber-500/40 bg-amber-500/[0.06] p-4 sm:p-5 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-amber-500 text-slate-950">
+                ⚠️ Revisão Necessária
+              </span>
+              <h4 class="font-extrabold text-sm sm:text-base text-amber-500">
+                Itens que precisam da sua classificação (<span id="invoice-needs-review-count">0</span>)
+              </h4>
+            </div>
+            <span class="text-xs text-slate-400">
+              Escolha o Setor, de quem é o gasto (Gabriel, Mirela ou Casal 50/50) ou renomeie para facilitar a identificação
+            </span>
+          </div>
+
+          <div id="invoice-needs-review-list" class="space-y-2.5"></div>
+        </div>
+
+        <!-- 2. LISTA: ITENS JÁ CLASSIFICADOS AUTOMATICAMENTE -->
+        <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 p-4 sm:p-5 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                ✓ Classificados Automaticamente
+              </span>
+              <h4 class="font-extrabold text-sm sm:text-base">
+                Itens reconhecidos por categoria (<span id="invoice-auto-classified-count">0</span>)
+              </h4>
+            </div>
+            <span class="text-xs text-slate-400">
+              Uber, 99, Bilhete Único, iFood, Mercados, Farmácias, Compras e Taxas — você também pode editar qualquer item
+            </span>
+          </div>
+
+          <div id="invoice-auto-classified-list" class="space-y-2"></div>
+        </div>
+
+      </div>
+
+      <!-- Rodapé Fixo com Botão Final de Confirmação -->
+      <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap items-center justify-between gap-3">
+        <div class="text-xs text-slate-400">
+          Forma de pagamento aplicada: <strong class="text-slate-700 dark:text-slate-200">💳 Cartão de Crédito</strong> • Gastos marcados como <strong>Casal</strong> são divididos 50/50 automaticamente.
+        </div>
+        <div class="flex items-center gap-2.5 ml-auto">
+          <button type="button" onclick="closeInvoiceReviewModal()"
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+            Cancelar
+          </button>
+          <button type="button" onclick="confirmAndSaveInvoiceItems()"
+            class="px-6 py-2.5 rounded-xl cta-scan-btn text-xs sm:text-sm font-extrabold flex items-center gap-2 shadow-lg">
+            <span>💾 Confirmar e Lançar nas Despesas</span>
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 

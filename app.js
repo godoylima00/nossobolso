@@ -103,6 +103,14 @@ let pendingReceiptData = {
   rawText: ''
 };
 
+let pendingInvoiceReview = {
+  titular: 'GABRIEL GODOY LIMA',
+  reversalsCount: 0,
+  groupFees: false,
+  items: [],
+  unmergedFeeItems: []
+};
+
 /* ==========================================================================
    Persistência Local
    ========================================================================== */
@@ -1369,16 +1377,34 @@ async function processUploadedImageDataUrl(dataUrl) {
   document.getElementById('scan-step-confirm').classList.add('hidden');
 
   const previewProcessingImg = document.getElementById('scan-processing-img');
-  if (previewProcessingImg) previewProcessingImg.src = dataUrl;
+  if (previewProcessingImg) {
+    if (dataUrl.startsWith('data:application/pdf')) {
+      previewProcessingImg.src =
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 260'%3E%3Crect width='200' height='260' fill='%230f172a'/%3E%3Crect x='35' y='30' width='130' height='175' rx='14' fill='%231e293b' stroke='%238b5cf6' stroke-width='3'/%3E%3Ctext x='100' y='115' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='28' fill='%23a855f7'%3EPDF%3C/text%3E%3Ctext x='100' y='145' text-anchor='middle' font-family='Arial' font-size='12' fill='%2394a3b8'%3EFatura Cart%C3%A3o%3C/text%3E%3C/svg%3E";
+    } else {
+      previewProcessingImg.src = dataUrl;
+    }
+  }
 
   const progressBar = document.getElementById('ocr-progress-bar');
   const progressText = document.getElementById('ocr-progress-status');
 
   try {
-    const extracted = await window.OCRService.recognizeReceiptFromImage(dataUrl, (pct, msg) => {
-      if (progressBar) progressBar.style.width = `${pct}%`;
-      if (progressText) progressText.textContent = msg;
-    });
+    const extracted = await window.OCRService.recognizeReceiptFromImage(
+      dataUrl,
+      (pct, msg) => {
+        if (progressBar) progressBar.style.width = `${pct}%`;
+        if (progressText) progressText.textContent = msg;
+      },
+      appState.currentMonth
+    );
+
+    // Cenário Fatura de Cartão de Crédito (PDF ou Print de Fatura com múltiplos itens)
+    if (extracted && extracted.tipo === 'fatura_cartao' && Array.isArray(extracted.items)) {
+      closeScanModal();
+      openInvoiceReviewModal(extracted);
+      return;
+    }
 
     // Cenário B: Print de Tabela Mensal (Gabriel & Mirela) lido por OCR/Gemini Vision
     if (extracted && extracted.tipo === 'planilha_casal') {
@@ -1585,8 +1611,297 @@ window.saveConfirmedTransaction = function(e) {
 };
 
 window.triggerDemoReceiptOCR = function(presetType) {
+  if (presetType === 'fatura_bradesco') {
+    const demoInvoice = window.OCRService.generateSampleBradescoStatementResult(appState.currentMonth);
+    closeScanModal();
+    openInvoiceReviewModal(demoInvoice);
+    showToast('Fatura Bradesco carregada! Revise os itens abaixo antes de confirmar.', 'info');
+    return;
+  }
   const sampleDataUrl = window.OCRService.generateSampleReceiptDataUrl(presetType, appState.currentMonth);
   processUploadedImageDataUrl(sampleDataUrl);
+};
+
+/* ==========================================================================
+   Pop-up Interativo de Revisão da Fatura PDF / Cartão (Bradesco Cartões)
+   ========================================================================== */
+
+window.openInvoiceReviewModal = function(invoiceData) {
+  const itemsCopy = (invoiceData.items || []).map(it => ({ ...it }));
+  pendingInvoiceReview = {
+    titular: invoiceData.titular || 'GABRIEL GODOY LIMA',
+    reversalsCount: Number(invoiceData.reversalsCount) || 0,
+    groupFees: false,
+    items: itemsCopy,
+    unmergedFeeItems: []
+  };
+
+  const groupCheckbox = document.getElementById('invoice-group-fees-checkbox');
+  if (groupCheckbox) groupCheckbox.checked = false;
+
+  const holderBadge = document.getElementById('invoice-review-holder-badge');
+  if (holderBadge) {
+    holderBadge.textContent = `Titular: ${pendingInvoiceReview.titular}`;
+  }
+
+  const revBadge = document.getElementById('invoice-review-reversal-badge');
+  if (revBadge) {
+    if (pendingInvoiceReview.reversalsCount > 0) {
+      revBadge.classList.remove('hidden');
+      revBadge.textContent = `🔄 ${pendingInvoiceReview.reversalsCount} estorno(s) abatido(s) automaticamente`;
+    } else {
+      revBadge.classList.add('hidden');
+    }
+  }
+
+  renderInvoiceReviewModalLists();
+  document.getElementById('invoice-review-modal').classList.remove('hidden');
+};
+
+window.closeInvoiceReviewModal = function() {
+  document.getElementById('invoice-review-modal').classList.add('hidden');
+};
+
+function buildInvoiceReviewRowHtml(item) {
+  const sectorOptionsHtml = SECTORS.map(sec => `
+    <option value="${sec.id}" ${item.sector === sec.id ? 'selected' : ''}>
+      ${sec.emoji} ${sec.shortName}
+    </option>
+  `).join('');
+
+  const dateShort = formatDateBR(item.date).slice(0, 5);
+
+  return `
+    <div id="inv-row-${item.id}" class="p-3 rounded-xl border transition ${
+      item.included
+        ? item.needsReview
+          ? 'bg-white dark:bg-slate-900 border-amber-500/40'
+          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+        : 'bg-slate-100/50 dark:bg-slate-900/30 border-slate-200/50 dark:border-slate-800/50 opacity-60'
+    }">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <!-- Checkbox Incluir / Ignorar -->
+        <label class="inline-flex items-center gap-2 cursor-pointer select-none shrink-0">
+          <input type="checkbox" ${item.included ? 'checked' : ''}
+            onchange="updateInvoiceReviewItem('${item.id}', 'included', this.checked)"
+            class="w-4 h-4 accent-purple-600 rounded cursor-pointer" />
+          <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+            ${dateShort}
+          </span>
+        </label>
+
+        <!-- Nome / Descrição Editável -->
+        <div class="flex-1 min-w-[180px]">
+          <input type="text"
+            value="${escapeHtml(item.merchant)}"
+            oninput="updateInvoiceReviewItem('${item.id}', 'merchant', this.value)"
+            placeholder="Nome fácil de identificar..."
+            class="w-full px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          <div class="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-slate-400">
+            <span>Fatura: <code class="font-mono">${escapeHtml(item.originalDescription)}</code></span>
+            ${item.isReversed ? `
+              <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold">
+                🔄 ${escapeHtml(item.reversalNote || 'Compra estornada na fatura')}
+              </span>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- Dropdown de Setor / Categoria -->
+        <select onchange="updateInvoiceReviewItem('${item.id}', 'sector', this.value)"
+          class="w-full sm:w-auto min-w-[155px] px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+          ${sectorOptionsHtml}
+        </select>
+
+        <!-- Dropdown de Responsável (Gabriel / Mirela / Casal 50-50) -->
+        <select onchange="updateInvoiceReviewItem('${item.id}', 'owner', this.value)"
+          class="w-full sm:w-auto min-w-[135px] px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+          <option value="gabriel" ${item.owner === 'gabriel' ? 'selected' : ''}>👦 Gabriel</option>
+          <option value="mirela" ${item.owner === 'mirela' ? 'selected' : ''}>👩 Mirela</option>
+          <option value="casal" ${item.owner === 'casal' ? 'selected' : ''}>💑 Casal (50/50)</option>
+        </select>
+
+        <!-- Valor em R$ -->
+        <div class="text-right min-w-[95px] ml-auto">
+          <div class="text-sm font-extrabold ${item.included ? 'text-red-500' : 'text-slate-400 line-through'}">
+            ${formatCurrency(item.amount)}
+          </div>
+          ${item.owner === 'casal' && item.included ? `
+            <span class="block text-[10px] font-bold text-purple-400">
+              ${formatCurrency(item.amount / 2)} cada
+            </span>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderInvoiceReviewModalLists() {
+  const needsReviewListEl = document.getElementById('invoice-needs-review-list');
+  const autoClassifiedListEl = document.getElementById('invoice-auto-classified-list');
+  const needsReviewSectionEl = document.getElementById('invoice-needs-review-section');
+  const needsReviewCountEl = document.getElementById('invoice-needs-review-count');
+  const autoClassifiedCountEl = document.getElementById('invoice-auto-classified-count');
+
+  const needsReviewItems = pendingInvoiceReview.items.filter(i => i.needsReview);
+  const autoItems = pendingInvoiceReview.items.filter(i => !i.needsReview);
+
+  if (needsReviewCountEl) needsReviewCountEl.textContent = needsReviewItems.length;
+  if (autoClassifiedCountEl) autoClassifiedCountEl.textContent = autoItems.length;
+
+  if (needsReviewSectionEl) {
+    if (needsReviewItems.length === 0) {
+      needsReviewSectionEl.classList.add('hidden');
+    } else {
+      needsReviewSectionEl.classList.remove('hidden');
+    }
+  }
+
+  if (needsReviewListEl) {
+    needsReviewListEl.innerHTML = needsReviewItems.map(buildInvoiceReviewRowHtml).join('');
+  }
+
+  if (autoClassifiedListEl) {
+    autoClassifiedListEl.innerHTML = autoItems.length > 0
+      ? autoItems.map(buildInvoiceReviewRowHtml).join('')
+      : `<div class="text-xs text-slate-400 text-center py-4">Nenhum item classificado automaticamente.</div>`;
+  }
+
+  updateInvoiceReviewSummaryTotals();
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function updateInvoiceReviewSummaryTotals() {
+  const selected = pendingInvoiceReview.items.filter(i => i.included);
+  const totalSelected = selected.reduce((acc, i) => acc + parseAmountValue(i.amount), 0);
+
+  const countEl = document.getElementById('invoice-review-selected-count');
+  const totalEl = document.getElementById('invoice-review-selected-total');
+
+  if (countEl) countEl.textContent = `${selected.length} de ${pendingInvoiceReview.items.length} itens`;
+  if (totalEl) totalEl.textContent = formatCurrency(totalSelected);
+}
+
+window.updateInvoiceReviewItem = function(itemId, field, value) {
+  const idx = pendingInvoiceReview.items.findIndex(i => i.id === itemId);
+  if (idx === -1) return;
+
+  if (field === 'included') {
+    pendingInvoiceReview.items[idx].included = Boolean(value);
+    renderInvoiceReviewModalLists();
+    return;
+  }
+
+  if (field === 'merchant') {
+    pendingInvoiceReview.items[idx].merchant = value;
+    return;
+  }
+
+  if (field === 'sector') {
+    pendingInvoiceReview.items[idx].sector = value;
+    updateInvoiceReviewSummaryTotals();
+    return;
+  }
+
+  if (field === 'owner') {
+    pendingInvoiceReview.items[idx].owner = value;
+    renderInvoiceReviewModalLists();
+    return;
+  }
+};
+
+window.toggleAllInvoiceItems = function(checked) {
+  pendingInvoiceReview.items.forEach(item => {
+    item.included = item.isReversed ? false : Boolean(checked);
+  });
+  renderInvoiceReviewModalLists();
+};
+
+window.toggleInvoiceGroupFees = function(shouldGroup) {
+  pendingInvoiceReview.groupFees = Boolean(shouldGroup);
+
+  if (shouldGroup) {
+    const feeItems = pendingInvoiceReview.items.filter(i => i.isFeeOrTax && i.included);
+    if (feeItems.length <= 1) {
+      showToast('Há menos de 2 itens de taxas/encargos ativos na fatura para agrupar.', 'info');
+      return;
+    }
+    pendingInvoiceReview.unmergedFeeItems = feeItems.map(f => ({ ...f }));
+    const sumFees = feeItems.reduce((acc, f) => acc + parseAmountValue(f.amount), 0);
+    const firstDate = feeItems[0].date;
+
+    pendingInvoiceReview.items = pendingInvoiceReview.items.filter(i => !(i.isFeeOrTax && i.included));
+    pendingInvoiceReview.items.push({
+      id: 'inv_grouped_fees_' + Date.now(),
+      date: firstDate,
+      originalDescription: feeItems.map(f => f.originalDescription).join(' + '),
+      merchant: 'Taxas, Parcelamentos & Encargos Cartão',
+      amount: sumFees,
+      owner: 'gabriel',
+      sector: 'compras',
+      paymentMethod: 'Cartão de Crédito',
+      needsReview: false,
+      isFeeOrTax: true,
+      isGroupedFee: true,
+      isReversed: false,
+      included: true
+    });
+    renderInvoiceReviewModalLists();
+    showToast(`${feeItems.length} taxas/encargos agrupados em 1 único lançamento (${formatCurrency(sumFees)})!`, 'info');
+  } else if (pendingInvoiceReview.unmergedFeeItems.length > 0) {
+    pendingInvoiceReview.items = pendingInvoiceReview.items.filter(i => !i.isGroupedFee);
+    pendingInvoiceReview.items.push(...pendingInvoiceReview.unmergedFeeItems);
+    pendingInvoiceReview.unmergedFeeItems = [];
+    renderInvoiceReviewModalLists();
+  }
+};
+
+window.confirmAndSaveInvoiceItems = function() {
+  const approved = pendingInvoiceReview.items.filter(i => i.included && parseAmountValue(i.amount) > 0);
+  if (approved.length === 0) {
+    showToast('Selecione pelo menos 1 item da fatura para lançar.', 'warning');
+    return;
+  }
+
+  let addedCount = 0;
+  let totalAddedAmount = 0;
+
+  for (const item of approved) {
+    const cleanMerchant = String(item.merchant || item.originalDescription || 'Compra Cartão')
+      .replace(/\s*\(50%\s*Casal\)\s*$/i, '')
+      .trim();
+    const amount = parseAmountValue(item.amount);
+    const owner = (item.owner || 'gabriel').toLowerCase().trim();
+    const sector = item.sector || 'compras';
+    const dayPart = (item.date || '').split('-')[2] || '10';
+    const targetDate = `${appState.currentMonth}-${dayPart}`;
+
+    appState.transactions.unshift({
+      id: 'tx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      amount,
+      date: targetDate,
+      time: '12:00',
+      merchant: cleanMerchant,
+      owner,
+      sector,
+      paymentMethod: 'Cartão de Crédito',
+      imageDataUrl: null,
+      imageSignature: null,
+      isRecurring: false
+    });
+
+    addedCount++;
+    totalAddedAmount += amount;
+  }
+
+  saveState();
+  closeInvoiceReviewModal();
+  renderAll();
+  showToast(
+    `Fatura importada! ${addedCount} lançamentos (${formatCurrency(totalAddedAmount)}) distribuídos nas despesas.`,
+    'success'
+  );
 };
 
 /* ==========================================================================
@@ -2048,10 +2363,15 @@ function setupUploadAndPasteListeners() {
       e.preventDefault();
       dropzone.classList.remove('drag-over');
       const file = e.dataTransfer?.files?.[0];
-      if (file && file.type.startsWith('image/')) {
+      const isPdfOrImage =
+        file &&
+        (file.type.startsWith('image/') ||
+         file.type === 'application/pdf' ||
+         /\.pdf$/i.test(file.name || ''));
+      if (isPdfOrImage) {
         handleImageFile(file);
       } else {
-        showToast('Envie um arquivo de imagem válido (PNG, JPG, WEBP).', 'warning');
+        showToast('Envie uma Fatura PDF (.pdf) ou imagem de comprovante (PNG, JPG, WEBP).', 'warning');
       }
     });
   }

@@ -1,6 +1,9 @@
 {
   "name": "nossobolso",
-  "version": "1.0.0",
-  "description": "Nosso Bolso - Controle Financeiro Pessoal (Gabriel & Mirela)",
-  "private": true
+  "version": "1.1.0",
+  "description": "Nosso Bolso - Controle Financeiro Pessoal em Tempo Real (Gabriel & Mirela)",
+  "private": true,
+  "dependencies": {
+    "firebase": "^11.0.2"
+  }
 }

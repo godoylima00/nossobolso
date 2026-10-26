@@ -200,6 +200,105 @@ function saveState() {
   }
 }
 
+/**
+ * Atualiza a interface de status de sincronização na nuvem, Loading Skeleton e Banner de aviso (.env)
+ */
+function updateCloudStatusUI({ status, message }) {
+  const bannerUnconf = document.getElementById('db-unconfigured-banner');
+  const unconfText = document.getElementById('db-unconfigured-text');
+  const skeletonEl = document.getElementById('cloud-loading-skeleton');
+  const loadingMsgEl = document.getElementById('cloud-loading-message');
+  const badgeDot = document.getElementById('cloud-sync-dot');
+  const badgeText = document.getElementById('cloud-sync-text');
+
+  if (status === 'loading') {
+    if (skeletonEl) skeletonEl.classList.remove('hidden');
+    if (loadingMsgEl && message) loadingMsgEl.textContent = message;
+    if (bannerUnconf) bannerUnconf.classList.add('hidden');
+    if (badgeDot) badgeDot.className = 'w-2 h-2 rounded-full bg-purple-400 animate-ping';
+    if (badgeText) badgeText.textContent = 'Sincronizando nuvem...';
+    return;
+  }
+
+  if (skeletonEl) skeletonEl.classList.add('hidden');
+
+  if (status === 'connected') {
+    if (bannerUnconf) bannerUnconf.classList.add('hidden');
+    if (badgeDot) badgeDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+    if (badgeText) badgeText.textContent = '☁️ Nuvem ativa (Tempo Real)';
+    return;
+  }
+
+  if (status === 'unconfigured' || status === 'error') {
+    if (bannerUnconf) bannerUnconf.classList.remove('hidden');
+    if (unconfText) {
+      unconfText.textContent =
+        message || 'Banco de Dados não configurado. Adicione suas chaves no arquivo .env';
+    }
+    if (badgeDot) badgeDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+    if (badgeText) badgeText.textContent = '⚠️ Modo Local (.env pendente)';
+  }
+}
+
+/**
+ * Inicializa a sincronização em Tempo Real (Firebase Firestore) com fallback automático para localStorage
+ */
+function initCloudPersistence() {
+  if (!window.CloudDB || typeof window.CloudDB.initCloudDatabase !== 'function') {
+    updateCloudStatusUI({
+      status: 'unconfigured',
+      message: 'Banco de Dados não configurado. Adicione suas chaves no arquivo .env'
+    });
+    return;
+  }
+
+  window.CloudDB.initCloudDatabase({
+    onStatusChange: (statusInfo) => {
+      updateCloudStatusUI(statusInfo);
+    },
+    onStateChange: async (cloudData, { isFirstLoad }) => {
+      const cloudEmpty =
+        (!cloudData.transactions || cloudData.transactions.length === 0) &&
+        (!cloudData.subscriptions || cloudData.subscriptions.length === 0) &&
+        Object.keys(cloudData.monthlySalaries || {}).length === 0;
+
+      const localHasData =
+        (appState.transactions && appState.transactions.length > 0) ||
+        (appState.subscriptions && appState.subscriptions.length > 0) ||
+        Object.keys(appState.monthlySalaries || {}).length > 0;
+
+      // Se a nuvem acabou de conectar pela 1ª vez e está vazia, mas há dados locais, envia para a nuvem automaticamente!
+      if (isFirstLoad && cloudEmpty && localHasData) {
+        await window.CloudDB.syncFullStateToCloud(appState);
+        showToast('Seus dados locais foram migrados automaticamente para a nuvem!', 'success');
+        return;
+      }
+
+      if (cloudData.meta) {
+        if (cloudData.meta.sectorLimits) {
+          appState.sectorLimits = { ...appState.sectorLimits, ...cloudData.meta.sectorLimits };
+        }
+        if (cloudData.meta.dismissedRecurringByMonth) {
+          appState.dismissedRecurringByMonth = cloudData.meta.dismissedRecurringByMonth;
+        }
+      }
+
+      if (cloudData.monthlySalaries) {
+        appState.monthlySalaries = cloudData.monthlySalaries;
+      }
+      if (Array.isArray(cloudData.subscriptions)) {
+        appState.subscriptions = cloudData.subscriptions;
+      }
+      if (Array.isArray(cloudData.transactions)) {
+        appState.transactions = cloudData.transactions;
+      }
+
+      saveState();
+      renderAll();
+    }
+  });
+}
+
 /* ==========================================================================
    Formatação e Utilitários
    ========================================================================== */
@@ -288,6 +387,8 @@ function showToast(message, type = 'success') {
 
 function ensureRecurringTransactionsForMonth(yyyyMM) {
   let changed = false;
+  const toUpsertCloud = [];
+  const toDeleteCloud = [];
   const dismissedList = appState.dismissedRecurringByMonth?.[yyyyMM] || [];
   for (const sub of appState.subscriptions) {
     const recurringTxId = `rec_${sub.id}_${yyyyMM}`;
@@ -296,6 +397,7 @@ function ensureRecurringTransactionsForMonth(yyyyMM) {
     if (!sub.active || dismissedList.includes(sub.id)) {
       if (existingIdx !== -1) {
         appState.transactions.splice(existingIdx, 1);
+        toDeleteCloud.push(recurringTxId);
         changed = true;
       }
       continue;
@@ -307,7 +409,7 @@ function ensureRecurringTransactionsForMonth(yyyyMM) {
     const numAmount = parseAmountValue(sub.amount);
 
     if (existingIdx === -1) {
-      appState.transactions.push({
+      const recTx = {
         id: recurringTxId,
         date: `${yyyyMM}-${dayStr}`,
         time: '08:00',
@@ -320,7 +422,9 @@ function ensureRecurringTransactionsForMonth(yyyyMM) {
         imageSignature: null,
         isRecurring: true,
         subscriptionId: sub.id
-      });
+      };
+      appState.transactions.push(recTx);
+      toUpsertCloud.push(recTx);
       changed = true;
     } else {
       const curr = appState.transactions[existingIdx];
@@ -333,7 +437,7 @@ function ensureRecurringTransactionsForMonth(yyyyMM) {
         curr.paymentMethod !== (sub.paymentMethod || 'PIX') ||
         curr.date !== expectedDate
       ) {
-        appState.transactions[existingIdx] = {
+        const updatedRecTx = {
           ...curr,
           date: expectedDate,
           merchant: cleanMerchant,
@@ -344,12 +448,18 @@ function ensureRecurringTransactionsForMonth(yyyyMM) {
           isRecurring: true,
           subscriptionId: sub.id
         };
+        appState.transactions[existingIdx] = updatedRecTx;
+        toUpsertCloud.push(updatedRecTx);
         changed = true;
       }
     }
   }
   if (changed) {
     saveState();
+    if (window.CloudDB && window.CloudDB.isConfigured()) {
+      if (toUpsertCloud.length > 0) window.CloudDB.upsertMultipleTransactions(toUpsertCloud);
+      if (toDeleteCloud.length > 0) window.CloudDB.deleteMultipleTransactionsByIds(toDeleteCloud);
+    }
   }
 }
 
@@ -1376,12 +1486,18 @@ window.changeMonth = function(delta) {
   const nextDate = new Date(y, m - 1 + delta, 1);
   appState.currentMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
   saveState();
+  if (window.CloudDB && window.CloudDB.isConfigured()) {
+    window.CloudDB.saveMonthMeta(appState);
+  }
   renderAll();
 };
 
 window.toggleDarkMode = function() {
   appState.darkMode = !appState.darkMode;
   saveState();
+  if (window.CloudDB && window.CloudDB.isConfigured()) {
+    window.CloudDB.saveMonthMeta(appState);
+  }
   renderAll();
 };
 
@@ -1503,6 +1619,7 @@ async function processUploadedImageDataUrl(dataUrl) {
       };
 
       let addedCount = 0;
+      const newOcrTxs = [];
       const pushOCRItem = (rawItem, ownerKey) => {
         const amount = Number(rawItem.valor) || 0;
         const merchant = (rawItem.descricao || '').trim();
@@ -1510,7 +1627,7 @@ async function processUploadedImageDataUrl(dataUrl) {
         const date = `${targetMonth}-05`;
         const sector = window.OCRService.normalizeGeminiSector(rawItem.setor, merchant);
         if (!checkDuplicateTransaction({ amount, date, merchant, owner: ownerKey })) {
-          appState.transactions.unshift({
+          const txObj = {
             id: 'tx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
             amount,
             date,
@@ -1522,7 +1639,9 @@ async function processUploadedImageDataUrl(dataUrl) {
             imageDataUrl: pendingReceiptData.imageDataUrl,
             imageSignature: null,
             isRecurring: false
-          });
+          };
+          appState.transactions.unshift(txObj);
+          newOcrTxs.push(txObj);
           addedCount++;
         }
       };
@@ -1531,6 +1650,13 @@ async function processUploadedImageDataUrl(dataUrl) {
       for (const mItem of (extracted.despesasMirela || [])) pushOCRItem(mItem, 'mirela');
 
       saveState();
+      if (window.CloudDB && window.CloudDB.isConfigured()) {
+        const updatedSal = appState.monthlySalaries[targetMonth];
+        window.CloudDB.saveMonthlySalary(targetMonth, updatedSal.gabriel, updatedSal.mirela);
+        if (newOcrTxs.length > 0) {
+          window.CloudDB.upsertMultipleTransactions(newOcrTxs);
+        }
+      }
       closeScanModal();
       renderAll();
       showToast(`Print lido com sucesso! ${addedCount} despesas adicionadas no mês.`);
@@ -1666,6 +1792,14 @@ window.saveConfirmedTransaction = function(e) {
         }
       }
 
+      if (window.CloudDB && window.CloudDB.isConfigured()) {
+        window.CloudDB.upsertTransaction(appState.transactions[idx]);
+        if (existingTx.subscriptionId) {
+          const updatedSub = appState.subscriptions.find(s => s.id === existingTx.subscriptionId);
+          if (updatedSub) window.CloudDB.upsertSubscription(updatedSub);
+        }
+      }
+
       showToast('Lançamento atualizado com sucesso!');
     }
   } else {
@@ -1687,6 +1821,11 @@ window.saveConfirmedTransaction = function(e) {
     const txMonth = date.slice(0, 7);
     if (txMonth && txMonth.length === 7 && txMonth !== appState.currentMonth) {
       appState.currentMonth = txMonth;
+    }
+
+    if (window.CloudDB && window.CloudDB.isConfigured()) {
+      window.CloudDB.upsertTransaction(newTx);
+      window.CloudDB.saveMonthMeta(appState);
     }
     showToast(`Gasto de ${formatCurrency(amount)} (${merchant}) registrado!`);
   }
@@ -1952,6 +2091,7 @@ window.confirmAndSaveInvoiceItems = function() {
 
   let addedCount = 0;
   let totalAddedAmount = 0;
+  const newInvoiceTxs = [];
 
   for (const item of approved) {
     const cleanMerchant = String(item.merchant || item.originalDescription || 'Compra Cartão')
@@ -1963,7 +2103,7 @@ window.confirmAndSaveInvoiceItems = function() {
     const dayPart = (item.date || '').split('-')[2] || '10';
     const targetDate = `${appState.currentMonth}-${dayPart}`;
 
-    appState.transactions.unshift({
+    const txObj = {
       id: 'tx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
       amount,
       date: targetDate,
@@ -1975,13 +2115,18 @@ window.confirmAndSaveInvoiceItems = function() {
       imageDataUrl: null,
       imageSignature: null,
       isRecurring: false
-    });
+    };
+    appState.transactions.unshift(txObj);
+    newInvoiceTxs.push(txObj);
 
     addedCount++;
     totalAddedAmount += amount;
   }
 
   saveState();
+  if (window.CloudDB && window.CloudDB.isConfigured()) {
+    window.CloudDB.upsertMultipleTransactions(newInvoiceTxs);
+  }
   closeInvoiceReviewModal();
   renderAll();
   showToast(
@@ -2048,6 +2193,12 @@ window.deleteTransaction = function(txId) {
   }
 
   saveState();
+  if (window.CloudDB && window.CloudDB.isConfigured()) {
+    window.CloudDB.deleteTransactionById(txId);
+    if (removed.isRecurring && removed.subscriptionId) {
+      window.CloudDB.deleteSubscriptionById(removed.subscriptionId);
+    }
+  }
   renderAll();
   showToast(`Despesa "${removed.merchant}" removida.`, 'info');
 };
@@ -2094,16 +2245,19 @@ window.updateIncomeModalSumPreview = function() {
 
 window.saveMonthlyIncome = function(e) {
   if (e) e.preventDefault();
-  const gabrielVal = parseFloat(document.getElementById('income-gabriel-input').value) || 0;
-  const mirelaVal = parseFloat(document.getElementById('income-mirela-input').value) || 0;
+  const gabrielVal = Math.max(0, parseFloat(document.getElementById('income-gabriel-input').value) || 0);
+  const mirelaVal = Math.max(0, parseFloat(document.getElementById('income-mirela-input').value) || 0);
 
   if (!appState.monthlySalaries) appState.monthlySalaries = {};
   appState.monthlySalaries[appState.currentMonth] = {
-    gabriel: Math.max(0, gabrielVal),
-    mirela: Math.max(0, mirelaVal)
+    gabriel: gabrielVal,
+    mirela: mirelaVal
   };
 
   saveState();
+  if (window.CloudDB && window.CloudDB.isConfigured()) {
+    window.CloudDB.saveMonthlySalary(appState.currentMonth, gabrielVal, mirelaVal);
+  }
   renderAll();
   document.getElementById('income-modal').classList.add('hidden');
   showToast(`Salários de ${formatMonthLabel(appState.currentMonth)} atualizados!`);
@@ -2125,6 +2279,9 @@ window.saveSectorBudget = function(e) {
   if (sectorId && !isNaN(val) && val > 0) {
     appState.sectorLimits[sectorId] = val;
     saveState();
+    if (window.CloudDB && window.CloudDB.isConfigured()) {
+      window.CloudDB.saveMonthMeta(appState);
+    }
     renderAll();
     document.getElementById('budget-modal').classList.add('hidden');
     showToast('Teto de gastos atualizado com sucesso!');
@@ -2211,7 +2368,7 @@ window.addSubscription = function(e) {
     const idx = appState.subscriptions.findIndex(s => s.id === editingSubscriptionId);
     if (idx !== -1) {
       const oldSub = appState.subscriptions[idx];
-      appState.subscriptions[idx] = {
+      const updatedSubObj = {
         ...oldSub,
         merchant,
         owner,
@@ -2220,13 +2377,15 @@ window.addSubscription = function(e) {
         sector,
         paymentMethod
       };
+      appState.subscriptions[idx] = updatedSubObj;
 
       // Atualiza também quaisquer lançamentos recorrentes vinculados a esta assinatura (sem duplicar)
       const dayStr = String(day).padStart(2, '0');
+      const updatedRecTxs = [];
       appState.transactions = appState.transactions.map(tx => {
         if (tx.subscriptionId === editingSubscriptionId || tx.id.startsWith(`rec_${editingSubscriptionId}_`)) {
           const txMonth = (tx.date || appState.currentMonth).slice(0, 7);
-          return {
+          const nextRec = {
             ...tx,
             date: `${txMonth}-${dayStr}`,
             merchant,
@@ -2237,6 +2396,8 @@ window.addSubscription = function(e) {
             isRecurring: true,
             subscriptionId: editingSubscriptionId
           };
+          updatedRecTxs.push(nextRec);
+          return nextRec;
         }
         return tx;
       });
@@ -2245,6 +2406,12 @@ window.addSubscription = function(e) {
       cancelSubscriptionEdit();
       ensureRecurringTransactionsForMonth(appState.currentMonth);
       saveState();
+      if (window.CloudDB && window.CloudDB.isConfigured()) {
+        window.CloudDB.upsertSubscription(updatedSubObj);
+        if (updatedRecTxs.length > 0) {
+          window.CloudDB.upsertMultipleTransactions(updatedRecTxs);
+        }
+      }
       renderAll();
       showToast(`Gasto fixo "${updatedName}" atualizado com sucesso!`);
       return;
@@ -2270,6 +2437,10 @@ window.addSubscription = function(e) {
   }
   ensureRecurringTransactionsForMonth(appState.currentMonth);
   saveState();
+  if (window.CloudDB && window.CloudDB.isConfigured()) {
+    window.CloudDB.upsertSubscription(newSub);
+    window.CloudDB.saveMonthMeta(appState);
+  }
   renderAll();
   e.target.reset();
   const dayInput = document.getElementById('sub-day');
@@ -2287,6 +2458,10 @@ window.toggleSubscriptionActive = function(subId) {
   }
   ensureRecurringTransactionsForMonth(appState.currentMonth);
   saveState();
+  if (window.CloudDB && window.CloudDB.isConfigured()) {
+    window.CloudDB.upsertSubscription(sub);
+    window.CloudDB.saveMonthMeta(appState);
+  }
   renderAll();
 };
 
@@ -2294,11 +2469,21 @@ window.deleteSubscription = function(subId) {
   if (editingSubscriptionId === subId) {
     cancelSubscriptionEdit();
   }
+  const removedRecTxIds = appState.transactions
+    .filter(t => t.subscriptionId === subId || t.id.startsWith(`rec_${subId}_`))
+    .map(t => t.id);
+
   appState.subscriptions = appState.subscriptions.filter(s => s.id !== subId);
   appState.transactions = appState.transactions.filter(
     t => t.subscriptionId !== subId && !t.id.startsWith(`rec_${subId}_`)
   );
   saveState();
+  if (window.CloudDB && window.CloudDB.isConfigured()) {
+    window.CloudDB.deleteSubscriptionById(subId);
+    if (removedRecTxIds.length > 0) {
+      window.CloudDB.deleteMultipleTransactionsByIds(removedRecTxIds);
+    }
+  }
   renderAll();
   showToast('Gasto fixo removido.', 'info');
 };
@@ -2360,6 +2545,9 @@ window.clearPersonMonthExpenses = function(personKey) {
   }
 
   const updatedTransactions = [];
+  const deletedCloudIds = [];
+  const upsertedCloudTxs = [];
+
   for (const tx of appState.transactions) {
     if (!tx.date || !tx.date.startsWith(month)) {
       updatedTransactions.push(tx);
@@ -2373,7 +2561,7 @@ window.clearPersonMonthExpenses = function(personKey) {
           appState.dismissedRecurringByMonth[month].push(tx.subscriptionId);
         }
       }
-      // Remove este lançamento de targetOwner
+      deletedCloudIds.push(tx.id);
       continue;
     }
 
@@ -2382,17 +2570,20 @@ window.clearPersonMonthExpenses = function(personKey) {
         if (!appState.dismissedRecurringByMonth[month].includes(tx.subscriptionId)) {
           appState.dismissedRecurringByMonth[month].push(tx.subscriptionId);
         }
+        deletedCloudIds.push(tx.id);
       }
       // Mantém apenas a metade (50%) da outra pessoa para esvaziar completamente a lista de targetOwner
       const halfAmount = parseAmountValue(tx.amount) / 2;
-      updatedTransactions.push({
+      const halfTx = {
         ...tx,
         id: tx.isRecurring ? `tx_half_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` : tx.id,
         owner: otherOwner,
         amount: halfAmount,
         isRecurring: false,
         subscriptionId: null
-      });
+      };
+      updatedTransactions.push(halfTx);
+      upsertedCloudTxs.push(halfTx);
       continue;
     }
 
@@ -2404,6 +2595,11 @@ window.clearPersonMonthExpenses = function(personKey) {
     appState.personBoardState[targetOwner].sectorFilter = 'all';
   }
   saveState();
+  if (window.CloudDB && window.CloudDB.isConfigured()) {
+    if (deletedCloudIds.length > 0) window.CloudDB.deleteMultipleTransactionsByIds(deletedCloudIds);
+    if (upsertedCloudTxs.length > 0) window.CloudDB.upsertMultipleTransactions(upsertedCloudTxs);
+    window.CloudDB.saveMonthMeta(appState);
+  }
   renderAll();
   showToast(`Todas as despesas de ${labelPerson} em ${formatMonthLabel(month)} foram removidas!`, 'info');
 };
@@ -2413,12 +2609,20 @@ window.clearCurrentMonthData = function() {
   if (!appState.dismissedRecurringByMonth) appState.dismissedRecurringByMonth = {};
   appState.dismissedRecurringByMonth[month] = (appState.subscriptions || []).map(s => s.id);
 
+  const deletedIds = appState.transactions
+    .filter(t => t.date && t.date.startsWith(month))
+    .map(t => t.id);
+
   appState.transactions = appState.transactions.filter(t => !t.date || !t.date.startsWith(month));
   if (appState.personBoardState) {
     appState.personBoardState.gabriel = { sectorFilter: 'all', collapsedSectors: {} };
     appState.personBoardState.mirela = { sectorFilter: 'all', collapsedSectors: {} };
   }
   saveState();
+  if (window.CloudDB && window.CloudDB.isConfigured()) {
+    if (deletedIds.length > 0) window.CloudDB.deleteMultipleTransactionsByIds(deletedIds);
+    window.CloudDB.saveMonthMeta(appState);
+  }
   renderAll();
   showToast(`Todos os gastos de ${formatMonthLabel(month)} foram zerados!`, 'info');
 };
@@ -2505,14 +2709,17 @@ window.importBackupJSON = function(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
       const imported = JSON.parse(e.target.result);
       if (imported && Array.isArray(imported.transactions)) {
         appState = { ...appState, ...imported };
         saveState();
+        if (window.CloudDB && window.CloudDB.isConfigured()) {
+          await window.CloudDB.syncFullStateToCloud(appState);
+        }
         renderAll();
-        showToast('Backup restaurado com sucesso!');
+        showToast('Backup restaurado e sincronizado com sucesso!');
       } else {
         showToast('Arquivo de backup inválido.', 'danger');
       }
@@ -2527,16 +2734,59 @@ window.openSettingsModal = function() {
   const currentKey = window.OCRService && typeof window.OCRService.getConfiguredGeminiApiKey === 'function'
     ? window.OCRService.getConfiguredGeminiApiKey()
     : (localStorage.getItem('godoyfin_gemini_api_key') || '');
-  document.getElementById('settings-gemini-key').value = currentKey;
+  const geminiInput = document.getElementById('settings-gemini-key');
+  if (geminiInput) geminiInput.value = currentKey;
+
+  if (window.CloudDB && typeof window.CloudDB.getStoredFirebaseConfig === 'function') {
+    const fbCfg = window.CloudDB.getStoredFirebaseConfig();
+    const apiEl = document.getElementById('settings-fb-api-key');
+    const projEl = document.getElementById('settings-fb-project-id');
+    const authEl = document.getElementById('settings-fb-auth-domain');
+    const appEl = document.getElementById('settings-fb-app-id');
+    if (apiEl) apiEl.value = fbCfg.apiKey || '';
+    if (projEl) projEl.value = fbCfg.projectId || '';
+    if (authEl) authEl.value = fbCfg.authDomain || '';
+    if (appEl) appEl.value = fbCfg.appId || '';
+  }
+
   document.getElementById('settings-modal').classList.remove('hidden');
 };
 
 window.saveSettingsModal = function(e) {
   if (e) e.preventDefault();
-  const keyVal = document.getElementById('settings-gemini-key').value.trim();
+  const keyVal = document.getElementById('settings-gemini-key')?.value.trim() || '';
   localStorage.setItem('godoyfin_gemini_api_key', keyVal);
+
+  const fbApiKey = document.getElementById('settings-fb-api-key')?.value.trim() || '';
+  const fbProjectId = document.getElementById('settings-fb-project-id')?.value.trim() || '';
+  const fbAuthDomain = document.getElementById('settings-fb-auth-domain')?.value.trim() || '';
+  const fbAppId = document.getElementById('settings-fb-app-id')?.value.trim() || '';
+
+  if (window.CloudDB && typeof window.CloudDB.saveFirebaseConfigFromUI === 'function') {
+    window.CloudDB.saveFirebaseConfigFromUI({
+      VITE_FIREBASE_API_KEY: fbApiKey,
+      VITE_FIREBASE_PROJECT_ID: fbProjectId,
+      VITE_FIREBASE_AUTH_DOMAIN: fbAuthDomain || (fbProjectId ? `${fbProjectId}.firebaseapp.com` : ''),
+      VITE_FIREBASE_STORAGE_BUCKET: fbProjectId ? `${fbProjectId}.appspot.com` : '',
+      VITE_FIREBASE_APP_ID: fbAppId
+    });
+  }
+
   document.getElementById('settings-modal').classList.add('hidden');
   showToast('Configurações salvas!');
+};
+
+window.forceSyncLocalToCloud = async function() {
+  if (!window.CloudDB || !window.CloudDB.isConfigured()) {
+    showToast('Configure primeiro as chaves do Firebase (.env ou nos campos acima) antes de sincronizar.', 'warning');
+    return;
+  }
+  const ok = await window.CloudDB.syncFullStateToCloud(appState);
+  if (ok) {
+    showToast('Todos os dados locais foram enviados para a nuvem com sucesso!', 'success');
+  } else {
+    showToast('Erro ao enviar dados para a nuvem. Verifique as regras do Firestore.', 'danger');
+  }
 };
 
 /* ==========================================================================
@@ -2615,4 +2865,5 @@ document.addEventListener('DOMContentLoaded', () => {
   loadState();
   setupUploadAndPasteListeners();
   renderAll();
+  initCloudPersistence();
 });

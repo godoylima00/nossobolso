@@ -2750,6 +2750,53 @@ window.importBackupJSON = function(event) {
   reader.readAsText(file);
 };
 
+const DB_ADMIN_USER = 'godoyggl';
+const DB_ADMIN_PASS = '16110428Gg#';
+
+function isDatabaseAdminUnlocked() {
+  return sessionStorage.getItem('nossobolso_db_admin_unlocked') === 'true';
+}
+
+function updateDatabaseAdminUI() {
+  const isUnlocked = isDatabaseAdminUnlocked();
+  const lockedContainer = document.getElementById('sb-auth-locked-container');
+  const unlockedContainer = document.getElementById('sb-auth-unlocked-container');
+  const errorMsg = document.getElementById('sb-auth-error-msg');
+  if (errorMsg) errorMsg.classList.add('hidden');
+
+  if (isUnlocked) {
+    if (lockedContainer) lockedContainer.classList.add('hidden');
+    if (unlockedContainer) unlockedContainer.classList.remove('hidden');
+  } else {
+    if (lockedContainer) lockedContainer.classList.remove('hidden');
+    if (unlockedContainer) unlockedContainer.classList.add('hidden');
+    const pwdInput = document.getElementById('sb-auth-password');
+    if (pwdInput) pwdInput.value = '';
+  }
+}
+
+window.unlockDatabaseSettings = function() {
+  const loginInput = document.getElementById('sb-auth-login')?.value.trim().toLowerCase();
+  const passInput = document.getElementById('sb-auth-password')?.value;
+  const errorMsg = document.getElementById('sb-auth-error-msg');
+
+  if (loginInput === DB_ADMIN_USER && passInput === DB_ADMIN_PASS) {
+    sessionStorage.setItem('nossobolso_db_admin_unlocked', 'true');
+    if (errorMsg) errorMsg.classList.add('hidden');
+    updateDatabaseAdminUI();
+    showToast('Acesso de administrador liberado!', 'success');
+  } else {
+    if (errorMsg) errorMsg.classList.remove('hidden');
+    showToast('Login ou senha incorretos. Acesso restrito.', 'danger');
+  }
+};
+
+window.lockDatabaseSettings = function() {
+  sessionStorage.removeItem('nossobolso_db_admin_unlocked');
+  updateDatabaseAdminUI();
+  showToast('Acesso ao Banco de Dados bloqueado com sucesso.', 'info');
+};
+
 window.openSettingsModal = function() {
   const currentKey = window.OCRService && typeof window.OCRService.getConfiguredGeminiApiKey === 'function'
     ? window.OCRService.getConfiguredGeminiApiKey()
@@ -2765,6 +2812,7 @@ window.openSettingsModal = function() {
     if (anonEl) anonEl.value = sbCfg.anonKey || '';
   }
 
+  updateDatabaseAdminUI();
   document.getElementById('settings-modal').classList.remove('hidden');
 };
 
@@ -2773,14 +2821,17 @@ window.saveSettingsModal = function(e) {
   const keyVal = document.getElementById('settings-gemini-key')?.value.trim() || '';
   localStorage.setItem('godoyfin_gemini_api_key', keyVal);
 
-  const sbUrl = document.getElementById('settings-sb-url')?.value.trim() || '';
-  const sbAnonKey = document.getElementById('settings-sb-anon-key')?.value.trim() || '';
+  // Apenas altera ou desconecta o banco se estiver autenticado como administrador
+  if (isDatabaseAdminUnlocked()) {
+    const sbUrl = document.getElementById('settings-sb-url')?.value.trim() || '';
+    const sbAnonKey = document.getElementById('settings-sb-anon-key')?.value.trim() || '';
 
-  if (window.CloudDB && typeof window.CloudDB.saveSupabaseConfigFromUI === 'function') {
-    window.CloudDB.saveSupabaseConfigFromUI({
-      VITE_SUPABASE_URL: sbUrl,
-      VITE_SUPABASE_ANON_KEY: sbAnonKey
-    });
+    if (window.CloudDB && typeof window.CloudDB.saveSupabaseConfigFromUI === 'function') {
+      window.CloudDB.saveSupabaseConfigFromUI({
+        VITE_SUPABASE_URL: sbUrl,
+        VITE_SUPABASE_ANON_KEY: sbAnonKey
+      });
+    }
   }
 
   document.getElementById('settings-modal').classList.add('hidden');
@@ -2788,6 +2839,10 @@ window.saveSettingsModal = function(e) {
 };
 
 window.forceSyncLocalToCloud = async function() {
+  if (!isDatabaseAdminUnlocked()) {
+    showToast('Autentique-se como administrador para sincronizar dados com o banco.', 'warning');
+    return;
+  }
   if (!window.CloudDB || !window.CloudDB.isConfigured()) {
     showToast('Configure primeiro as chaves do Supabase (.env ou nos campos acima) antes de sincronizar.', 'warning');
     return;

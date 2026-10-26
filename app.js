@@ -244,59 +244,79 @@ function updateCloudStatusUI({ status, message }) {
  * Inicializa a sincronização em Tempo Real (Supabase) com fallback automático para localStorage
  */
 function initCloudPersistence() {
-  if (!window.CloudDB || typeof window.CloudDB.initCloudDatabase !== 'function') {
-    updateCloudStatusUI({
-      status: 'unconfigured',
-      message: 'Banco de Dados não configurado. Adicione suas chaves do Supabase no arquivo .env'
-    });
-    return;
-  }
+  const tryInit = () => {
+    if (window.CloudDB && typeof window.CloudDB.initCloudDatabase === 'function') {
+      window.CloudDB.initCloudDatabase({
+        onStatusChange: (statusInfo) => {
+          updateCloudStatusUI(statusInfo);
+        },
+        onStateChange: async (cloudData, { isFirstLoad }) => {
+          const cloudEmpty =
+            (!cloudData.transactions || cloudData.transactions.length === 0) &&
+            (!cloudData.subscriptions || cloudData.subscriptions.length === 0) &&
+            Object.keys(cloudData.monthlySalaries || {}).length === 0;
 
-  window.CloudDB.initCloudDatabase({
-    onStatusChange: (statusInfo) => {
-      updateCloudStatusUI(statusInfo);
-    },
-    onStateChange: async (cloudData, { isFirstLoad }) => {
-      const cloudEmpty =
-        (!cloudData.transactions || cloudData.transactions.length === 0) &&
-        (!cloudData.subscriptions || cloudData.subscriptions.length === 0) &&
-        Object.keys(cloudData.monthlySalaries || {}).length === 0;
+          const localHasData =
+            (appState.transactions && appState.transactions.length > 0) ||
+            (appState.subscriptions && appState.subscriptions.length > 0) ||
+            Object.keys(appState.monthlySalaries || {}).length > 0;
 
-      const localHasData =
-        (appState.transactions && appState.transactions.length > 0) ||
-        (appState.subscriptions && appState.subscriptions.length > 0) ||
-        Object.keys(appState.monthlySalaries || {}).length > 0;
+          // Se o Supabase acabou de conectar pela 1ª vez e está vazio, mas há dados locais, envia para a nuvem automaticamente!
+          if (isFirstLoad && cloudEmpty && localHasData) {
+            await window.CloudDB.syncFullStateToCloud(appState);
+            showToast('Seus dados locais foram migrados automaticamente para o Supabase!', 'success');
+            return;
+          }
 
-      // Se a nuvem acabou de conectar pela 1ª vez e está vazia, mas há dados locais, envia para a nuvem automaticamente!
-      if (isFirstLoad && cloudEmpty && localHasData) {
-        await window.CloudDB.syncFullStateToCloud(appState);
-        showToast('Seus dados locais foram migrados automaticamente para a nuvem!', 'success');
-        return;
-      }
+          if (cloudData.meta) {
+            if (cloudData.meta.sectorLimits) {
+              appState.sectorLimits = { ...appState.sectorLimits, ...cloudData.meta.sectorLimits };
+            }
+            if (cloudData.meta.dismissedRecurringByMonth) {
+              appState.dismissedRecurringByMonth = cloudData.meta.dismissedRecurringByMonth;
+            }
+          }
 
-      if (cloudData.meta) {
-        if (cloudData.meta.sectorLimits) {
-          appState.sectorLimits = { ...appState.sectorLimits, ...cloudData.meta.sectorLimits };
+          if (cloudData.monthlySalaries) {
+            appState.monthlySalaries = cloudData.monthlySalaries;
+          }
+          if (Array.isArray(cloudData.subscriptions)) {
+            appState.subscriptions = cloudData.subscriptions;
+          }
+          if (Array.isArray(cloudData.transactions)) {
+            appState.transactions = cloudData.transactions;
+          }
+
+          saveState();
+          renderAll();
         }
-        if (cloudData.meta.dismissedRecurringByMonth) {
-          appState.dismissedRecurringByMonth = cloudData.meta.dismissedRecurringByMonth;
-        }
-      }
-
-      if (cloudData.monthlySalaries) {
-        appState.monthlySalaries = cloudData.monthlySalaries;
-      }
-      if (Array.isArray(cloudData.subscriptions)) {
-        appState.subscriptions = cloudData.subscriptions;
-      }
-      if (Array.isArray(cloudData.transactions)) {
-        appState.transactions = cloudData.transactions;
-      }
-
-      saveState();
-      renderAll();
+      });
+      return true;
     }
-  });
+    return false;
+  };
+
+  if (tryInit()) return;
+
+  // Se o módulo do Supabase ainda estiver carregando, aguarda de forma assíncrona antes de exibir aviso
+  let attempts = 0;
+  const pollInterval = setInterval(() => {
+    attempts++;
+    if (tryInit()) {
+      clearInterval(pollInterval);
+    } else if (attempts >= 40) {
+      clearInterval(pollInterval);
+      updateCloudStatusUI({
+        status: 'unconfigured',
+        message: 'Banco de Dados não configurado. Adicione suas chaves do Supabase no arquivo .env'
+      });
+    }
+  }, 50);
+
+  window.addEventListener('clouddb-ready', () => {
+    clearInterval(pollInterval);
+    tryInit();
+  }, { once: true });
 }
 
 /* ==========================================================================

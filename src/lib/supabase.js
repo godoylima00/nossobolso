@@ -8,57 +8,87 @@
  * 2. `salarios`     -> Salários mensais de Gabriel e Mirela vinculados ao mês.
  * 3. `despesas`     -> Todas as despesas avulsas e compras de cartão/fatura.
  * 4. `gastos_fixos` -> Assinaturas e despesas fixas recorrentes.
- *
- * Sincronização em Tempo Real:
- * - Utiliza Supabase Realtime Channels (`postgres_changes`) em todas as 4 tabelas
- *   para atualização instantânea entre PC e Celular sem recarregar a tela.
- * - Fallback automático para `localStorage` caso as chaves não estejam configuradas.
  */
+
+// Garante que import.meta.env exista de forma segura sem quebrar o navegador
+if (typeof import.meta !== 'undefined' && !import.meta.env) {
+  try {
+    import.meta.env = {};
+  } catch (_) {}
+}
+
+// Log de depuração estrito solicitado para validação na Vercel / Vite
+try {
+  console.log('Supabase URL presente:', !!import.meta.env.VITE_SUPABASE_URL);
+} catch (_) {
+  console.log('Supabase URL presente:', false);
+}
 
 (function () {
   const SUPABASE_CONFIG_STORAGE_KEY = 'nossobolso_supabase_config_v1';
 
-  function getEnvVar(viteKey) {
-    try {
-      if (typeof importMetaEnv !== 'undefined' && importMetaEnv && importMetaEnv[viteKey]) {
-        return String(importMetaEnv[viteKey]).trim();
-      }
-    } catch (_) {}
+  /**
+   * Obtém as credenciais estritamente através de import.meta.env com fallbacks
+   * ordenados para o build da Vercel e execução local.
+   */
+  function getSupabaseCredentials() {
+    let url = '';
+    let anonKey = '';
 
+    // 1. Leitura estática direta de import.meta.env (substituída pelo Vite na Vercel)
     try {
-      if (typeof window !== 'undefined') {
-        if (window.__VITE_ENV__ && window.__VITE_ENV__[viteKey]) {
-          return String(window.__VITE_ENV__[viteKey]).trim();
+      if (typeof import.meta !== 'undefined' && import.meta.env) {
+        if (import.meta.env.VITE_SUPABASE_URL) {
+          url = String(import.meta.env.VITE_SUPABASE_URL).trim();
         }
-        if (window.GODOY_ENV && window.GODOY_ENV[viteKey]) {
-          return String(window.GODOY_ENV[viteKey]).trim();
-        }
-      }
-    } catch (_) {}
-
-    try {
-      const savedRaw = localStorage.getItem(SUPABASE_CONFIG_STORAGE_KEY);
-      if (savedRaw) {
-        const parsed = JSON.parse(savedRaw);
-        if (parsed && parsed[viteKey]) {
-          return String(parsed[viteKey]).trim();
+        if (import.meta.env.VITE_SUPABASE_ANON_KEY) {
+          anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY).trim();
         }
       }
     } catch (_) {}
 
-    return '';
-  }
+    // 2. Injeção estática do script de build da Vercel (env-config.js gerado por build.js)
+    try {
+      if (!url && typeof window !== 'undefined' && window.__VITE_ENV__) {
+        url = String(window.__VITE_ENV__.VITE_SUPABASE_URL || '').trim();
+      }
+      if (!anonKey && typeof window !== 'undefined' && window.__VITE_ENV__) {
+        anonKey = String(window.__VITE_ENV__.VITE_SUPABASE_ANON_KEY || '').trim();
+      }
+    } catch (_) {}
 
-  function buildSupabaseConfig() {
-    let rawUrl = (getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL') || '').trim();
-    // Remove automaticamente "/rest/v1/" e barras finais caso o usuário tenha copiado a URL completa da Data API
-    if (rawUrl) {
-      rawUrl = rawUrl.replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+    // 3. Fallback de desenvolvimento local window.GODOY_ENV (env-local.js)
+    try {
+      if (!url && typeof window !== 'undefined' && window.GODOY_ENV) {
+        url = String(window.GODOY_ENV.VITE_SUPABASE_URL || window.GODOY_ENV.SUPABASE_URL || '').trim();
+      }
+      if (!anonKey && typeof window !== 'undefined' && window.GODOY_ENV) {
+        anonKey = String(window.GODOY_ENV.VITE_SUPABASE_ANON_KEY || window.GODOY_ENV.SUPABASE_ANON_KEY || '').trim();
+      }
+    } catch (_) {}
+
+    // 4. Fallback LocalStorage (configurado via Modal de Configurações no navegador)
+    try {
+      if ((!url || !anonKey) && typeof localStorage !== 'undefined') {
+        const savedRaw = localStorage.getItem(SUPABASE_CONFIG_STORAGE_KEY);
+        if (savedRaw) {
+          const parsed = JSON.parse(savedRaw);
+          if (!url && parsed && parsed.VITE_SUPABASE_URL) url = String(parsed.VITE_SUPABASE_URL).trim();
+          if (!anonKey && parsed && parsed.VITE_SUPABASE_ANON_KEY) anonKey = String(parsed.VITE_SUPABASE_ANON_KEY).trim();
+        }
+      }
+    } catch (_) {}
+
+    // Limpeza de aspas acidentais e normalização da URL do Supabase
+    if (url) {
+      url = url.replace(/^["']|["']$/g, '').trim();
+      url = url.replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
     }
-    return {
-      url: rawUrl,
-      anonKey: getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY')
-    };
+    if (anonKey) {
+      anonKey = anonKey.replace(/^["']|["']$/g, '').trim();
+    }
+
+    return { url, anonKey };
   }
 
   function hasValidConfig(cfg) {
@@ -66,6 +96,8 @@
       cfg &&
       cfg.url &&
       cfg.anonKey &&
+      cfg.url !== '' &&
+      cfg.anonKey !== '' &&
       cfg.url.startsWith('http') &&
       !cfg.url.includes('YOUR_') &&
       cfg.anonKey.length > 15
@@ -220,7 +252,7 @@
       }
     } catch (err) {
       console.error('[SupabaseDB] Erro ao carregar dados:', err);
-      notifyStatus('error', 'Erro ao consultar tabelas do Supabase. Verifique se o script SQL foi executado.');
+      notifyStatus('error', 'Erro ao consultar tabelas do Supabase.');
     }
   }
 
@@ -273,45 +305,76 @@
     }
   }
 
-  function initCloudDatabase(callbacks = {}) {
-    if (callbacks.onStateChange) onStateChangeCallback = callbacks.onStateChange;
-    if (callbacks.onStatusChange) onStatusChangeCallback = callbacks.onStatusChange;
-
-    const config = buildSupabaseConfig();
-    isConfigured = hasValidConfig(config);
-
-    if (!isConfigured) {
-      isConnected = false;
-      notifyStatus(
-        'unconfigured',
-        'Banco de Dados não configurado. Adicione suas chaves do Supabase no arquivo .env'
-      );
-      return { configured: false };
-    }
-
+  function connectWithCredentials(config) {
     if (typeof window.supabase === 'undefined' || typeof window.supabase.createClient !== 'function') {
       isConnected = false;
       notifyStatus(
         'error',
         'SDK do Supabase não pôde ser carregado. Usando armazenamento local temporariamente.'
       );
-      return { configured: false };
+      return false;
     }
 
     try {
       supabaseClient = window.supabase.createClient(config.url, config.anonKey, {
         auth: { persistSession: false }
       });
-
+      isConfigured = true;
       fetchAllTables();
       setupRealtimeListeners();
-      return { configured: true };
+      return true;
     } catch (err) {
       console.error('[SupabaseDB] Erro ao instanciar cliente Supabase:', err);
       isConnected = false;
       notifyStatus('error', 'Falha ao conectar ao Supabase.');
-      return { configured: false, error: err };
+      return false;
     }
+  }
+
+  async function tryFetchVercelApiEnv() {
+    try {
+      const res = await fetch('/api/env');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.VITE_SUPABASE_URL && data.VITE_SUPABASE_ANON_KEY) {
+          let url = String(data.VITE_SUPABASE_URL).trim();
+          url = url.replace(/^["']|["']$/g, '').trim();
+          url = url.replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+          const anonKey = String(data.VITE_SUPABASE_ANON_KEY).replace(/^["']|["']$/g, '').trim();
+          return { url, anonKey };
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function initCloudDatabase(callbacks = {}) {
+    if (callbacks.onStateChange) onStateChangeCallback = callbacks.onStateChange;
+    if (callbacks.onStatusChange) onStatusChangeCallback = callbacks.onStatusChange;
+
+    const config = getSupabaseCredentials();
+    isConfigured = hasValidConfig(config);
+
+    if (isConfigured) {
+      connectWithCredentials(config);
+      return { configured: true };
+    }
+
+    // Se as variáveis ainda não foram encontradas, tenta recuperar via /api/env da Vercel
+    tryFetchVercelApiEnv().then(remoteCfg => {
+      if (remoteCfg && hasValidConfig(remoteCfg)) {
+        console.log('[SupabaseDB] Credenciais obtidas via /api/env da Vercel!');
+        connectWithCredentials(remoteCfg);
+      } else {
+        isConnected = false;
+        notifyStatus(
+          'unconfigured',
+          'Banco de Dados não configurado. Adicione suas chaves do Supabase no arquivo .env'
+        );
+      }
+    });
+
+    return { configured: false };
   }
 
   /* ==========================================================================
@@ -424,7 +487,6 @@
         };
       });
 
-      // Divide em lotes de até 100 itens
       for (let i = 0; i < rows.length; i += 100) {
         const chunk = rows.slice(i, i + 100);
         await supabaseClient.from('despesas').upsert(chunk);
@@ -522,7 +584,7 @@
   }
 
   function getStoredSupabaseConfig() {
-    return buildSupabaseConfig();
+    return getSupabaseCredentials();
   }
 
   window.CloudDB = {
@@ -539,9 +601,10 @@
     deleteSubscriptionById,
     syncFullStateToCloud,
     saveSupabaseConfigFromUI,
-    getStoredSupabaseConfig,
-    // Alias compatível caso o app chame o nome antigo
-    saveFirebaseConfigFromUI: saveSupabaseConfigFromUI,
-    getStoredFirebaseConfig: getStoredSupabaseConfig
+    getStoredSupabaseConfig
   };
+
+  try {
+    window.dispatchEvent(new CustomEvent('clouddb-ready'));
+  } catch (_) {}
 })();

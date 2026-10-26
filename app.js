@@ -458,7 +458,7 @@ function renderSalariesAndTopCards(summary, prevSummary) {
     const committedPct = summary.income > 0 ? Math.min(999, (summary.totalExpense / summary.income) * 100) : 0;
     coupleStatusEl.textContent = summary.income > 0
       ? `${committedPct.toFixed(0)}% da renda do casal comprometida`
-      : 'Importe a planilha do mês ou edite os salários';
+      : 'Clique em Editar nos cards de salário para definir a renda';
   }
 
   // Card 4: Maior Vilão do Mês
@@ -473,7 +473,7 @@ function renderSalariesAndTopCards(summary, prevSummary) {
       villainDescEl.textContent = `${share}% dos gastos combinados no mês (${summary.txCount} itens)`;
     } else {
       villainTitleEl.textContent = 'Sem gastos no mês';
-      villainDescEl.textContent = 'Sincronize a planilha do mês ou adicione um print';
+      villainDescEl.textContent = 'Adicione um print (OCR) ou registre um gasto manual';
     }
   }
 }
@@ -519,9 +519,12 @@ function renderCoupleHorizontalBoards(summary) {
           ${txs.length === 0 ? `
             <div class="p-8 text-center text-xs sm:text-sm text-slate-400">
               Nenhuma despesa registrada em <strong>${title}</strong> para ${formatMonthLabel(appState.currentMonth)}.
-              <div class="mt-2">
-                <button onclick="openGoogleSheetsModal('paste')" class="text-purple-500 font-semibold hover:underline">
-                  Importar da Planilha do Mês &rarr;
+              <div class="mt-3 flex items-center justify-center gap-2 no-print">
+                <button onclick="openScanModal()" class="px-3 py-1.5 rounded-xl text-xs font-bold cta-scan-btn">
+                  + Adicionar Print
+                </button>
+                <button onclick="openQuickManualModal('mercado', '${personKey}')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:opacity-90 transition">
+                  + Adicionar Gasto
                 </button>
               </div>
             </div>
@@ -1075,7 +1078,7 @@ function renderSubscriptionsSection() {
     tbody.innerHTML = `
       <tr>
         <td colspan="6" class="text-center py-6 text-slate-400 text-sm">
-          Nenhuma assinatura fixa automática cadastrada. (Você pode importar os gastos mensais diretamente da planilha de Gabriel & Mirela ou cadastrar um gasto fixo aqui).
+          Nenhuma assinatura ou despesa fixa cadastrada. Use os campos acima para adicionar cobranças fixas mensais.
         </td>
       </tr>
     `;
@@ -1223,45 +1226,48 @@ async function processUploadedImageDataUrl(dataUrl) {
       if (progressText) progressText.textContent = msg;
     });
 
-    // Cenário B: Print da Planilha Mensal (Tabela Gabriel & Mirela)
+    // Cenário B: Print de Tabela Mensal (Gabriel & Mirela) lido por OCR/Gemini Vision
     if (extracted && extracted.tipo === 'planilha_casal') {
       const targetMonth = appState.currentMonth;
-      const items = [];
+      if (!appState.monthlySalaries) appState.monthlySalaries = {};
+      const currentSal = appState.monthlySalaries[targetMonth] || { gabriel: 0, mirela: 0 };
+      appState.monthlySalaries[targetMonth] = {
+        gabriel: extracted.salarioGabriel > 0 ? Number(extracted.salarioGabriel) : currentSal.gabriel,
+        mirela: extracted.salarioMirela > 0 ? Number(extracted.salarioMirela) : currentSal.mirela
+      };
 
-      for (const gItem of (extracted.despesasGabriel || [])) {
-        items.push({
-          date: `${targetMonth}-05`,
-          time: '12:00',
-          merchant: gItem.descricao,
-          owner: 'gabriel',
-          sector: window.OCRService.normalizeGeminiSector(gItem.setor, gItem.descricao),
-          paymentMethod: 'PIX',
-          amount: Number(gItem.valor) || 0
-        });
-      }
+      let addedCount = 0;
+      const pushOCRItem = (rawItem, ownerKey) => {
+        const amount = Number(rawItem.valor) || 0;
+        const merchant = (rawItem.descricao || '').trim();
+        if (!merchant || amount <= 0) return;
+        const date = `${targetMonth}-05`;
+        const sector = window.OCRService.normalizeGeminiSector(rawItem.setor, merchant);
+        if (!checkDuplicateTransaction({ amount, date, merchant, owner: ownerKey })) {
+          appState.transactions.unshift({
+            id: 'tx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+            amount,
+            date,
+            time: '12:00',
+            merchant,
+            owner: ownerKey,
+            sector,
+            paymentMethod: 'PIX',
+            imageDataUrl: pendingReceiptData.imageDataUrl,
+            imageSignature: null,
+            isRecurring: false
+          });
+          addedCount++;
+        }
+      };
 
-      for (const mItem of (extracted.despesasMirela || [])) {
-        items.push({
-          date: `${targetMonth}-05`,
-          time: '12:00',
-          merchant: mItem.descricao,
-          owner: 'mirela',
-          sector: window.OCRService.normalizeGeminiSector(mItem.setor, mItem.descricao),
-          paymentMethod: 'PIX',
-          amount: Number(mItem.valor) || 0
-        });
-      }
+      for (const gItem of (extracted.despesasGabriel || [])) pushOCRItem(gItem, 'gabriel');
+      for (const mItem of (extracted.despesasMirela || [])) pushOCRItem(mItem, 'mirela');
 
-      if (window.SheetsSyncService && typeof window.SheetsSyncService.applyParsedSheetDataToMonth === 'function') {
-        window.SheetsSyncService.applyParsedSheetDataToMonth({
-          isCoupleSheet: true,
-          salaryGabriel: extracted.salarioGabriel > 0 ? extracted.salarioGabriel : null,
-          salaryMirela: extracted.salarioMirela > 0 ? extracted.salarioMirela : null,
-          items
-        }, 'Print da Planilha (Gemini Vision)');
-      }
-
+      saveState();
       closeScanModal();
+      renderAll();
+      showToast(`Print lido com sucesso! ${addedCount} despesas adicionadas no mês.`);
       return;
     }
 
@@ -1397,10 +1403,6 @@ window.saveConfirmedTransaction = function(e) {
       appState.currentMonth = txMonth;
     }
     showToast(`Gasto de ${formatCurrency(amount)} (${merchant}) registrado!`);
-
-    if (window.SheetsSyncService && typeof window.SheetsSyncService.pushTransactionToGoogleSheets === 'function') {
-      window.SheetsSyncService.pushTransactionToGoogleSheets(newTx);
-    }
   }
 
   saveState();

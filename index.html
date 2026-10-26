@@ -36,9 +36,6 @@
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-  <!-- SheetJS (XLSX) CDN para leitura direta de arquivos .xlsx / .xls / .csv -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
   <!-- Tesseract.js v5 CDN (OCR Local no Navegador) -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
@@ -117,11 +114,6 @@
 
       <!-- Botões Principais de Ação (Unificados na Barra Lateral) -->
       <div class="p-4 space-y-2.5">
-        <button onclick="openGoogleSheetsModal('paste')"
-          class="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition">
-          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-          <span>Importar Planilha</span>
-        </button>
         <button onclick="openScanModal()"
           class="w-full py-3 px-4 rounded-2xl cta-scan-btn font-bold text-xs flex items-center justify-center gap-2">
           <i data-lucide="scan-line" class="w-4 h-4"></i>
@@ -362,7 +354,7 @@
 
           <div class="mt-4 pt-3.5 border-t border-slate-200/60 dark:border-white/[0.06]">
             <p id="card-villain-desc" class="text-xs text-slate-400 truncate">
-              Sincronize a planilha do mês ou adicione um print
+              Adicione um print (OCR) ou registre um gasto manual
             </p>
           </div>
         </div>
@@ -460,7 +452,7 @@
               </span>
             </div>
             <p class="text-xs text-slate-400 mt-0.5">
-              Cobranças opcionais lançadas automaticamente todo mês (ou importe direto da sua planilha mensal).
+              Cobranças fixas lançadas automaticamente todo mês.
             </p>
           </div>
         </div>
@@ -532,9 +524,9 @@
       <i data-lucide="wallet" class="w-5 h-5"></i>
       <span>Salários</span>
     </button>
-    <button onclick="openGoogleSheetsModal('paste')" class="flex flex-col items-center gap-0.5 text-xs font-medium text-emerald-500">
-      <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
-      <span>Planilha</span>
+    <button onclick="openQuickManualModal('mercado', 'gabriel')" class="flex flex-col items-center gap-0.5 text-xs font-medium text-amber-500">
+      <i data-lucide="zap" class="w-5 h-5"></i>
+      <span>Manual</span>
     </button>
 
     <button onclick="openScanModal()"
@@ -599,11 +591,7 @@
                 <span>Testar leitor OCR com comprovante gerado:</span>
               </span>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
-              <button type="button" onclick="triggerDemoReceiptOCR('planilha_casal')"
-                class="px-2.5 py-2 rounded-xl text-xs font-bold bg-emerald-600/15 text-emerald-500 hover:border-emerald-500 border border-emerald-500/30 transition text-center">
-                📊 Print Planilha
-              </button>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
               <button type="button" onclick="triggerDemoReceiptOCR('ifood')"
                 class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-red-500 border border-slate-200 dark:border-slate-700 transition text-center">
                 🍔 Print iFood
@@ -796,7 +784,7 @@
         </button>
       </div>
       <p class="text-xs text-slate-400">
-        Os salários são preenchidos automaticamente ao importar a planilha do mês ou podem ser ajustados aqui:
+        Defina abaixo os salários de Gabriel e Mirela para o mês selecionado:
       </p>
 
       <div class="space-y-3">
@@ -914,224 +902,6 @@
   </div>
 
   <!-- ====================================================================
-       MODAL DE INTEGRAÇÃO E LEITOR DINÂMICO DA PLANILHA (GABRIEL & MIRELA)
-       ==================================================================== -->
-  <div id="google-sheets-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
-    <div class="card-surface w-full max-w-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[92vh] flex flex-col">
-
-      <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center font-bold text-lg">
-            📊
-          </div>
-          <div>
-            <h3 class="font-extrabold text-base">Leitor Dinâmico da Planilha • Gabriel & Mirela</h3>
-            <p class="text-xs text-slate-400">Lê automaticamente SALÁRIO GABRIEL, SALÁRIO MIRELA, DESPESAS GABRIEL e DESPESAS MIRELA</p>
-          </div>
-        </div>
-        <button onclick="closeGoogleSheetsModal()" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <!-- Status de Sincronização Integrado ao Modal -->
-      <div class="px-6 pt-3">
-        <div class="px-3.5 py-2 rounded-xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200/70 dark:border-white/[0.06] flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div class="flex items-center gap-2">
-            <span id="sheets-sync-status-dot" class="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
-            <span id="sheets-sync-status-text" class="font-medium text-slate-600 dark:text-slate-300">
-              Última sincronização com Google Sheets: Ainda não sincronizado
-            </span>
-            <span id="sheets-webhook-active-badge"
-              class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-500">
-              Webhook Ativo
-            </span>
-          </div>
-          <button type="button" onclick="quickRefreshFromGoogleSheets()"
-            class="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1">
-            <i id="sheets-quick-refresh-icon" data-lucide="refresh-cw" class="w-3 h-3"></i>
-            <span>Atualizar da Planilha</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Abas Internas do Modal -->
-      <div class="px-6 pt-3">
-        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-          <button type="button" id="sheets-tab-btn-import" onclick="switchSheetsModalTab('import')"
-            class="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-sm transition flex items-center justify-center gap-1.5">
-            <span>🔗 Link ou Arquivo</span>
-          </button>
-          <button type="button" id="sheets-tab-btn-paste" onclick="switchSheetsModalTab('paste')"
-            class="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition flex items-center justify-center gap-1.5">
-            <span>📋 Colar Planilha (Ctrl+V)</span>
-          </button>
-          <button type="button" id="sheets-tab-btn-webhook" onclick="switchSheetsModalTab('webhook')"
-            class="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition flex items-center justify-center gap-1.5">
-            <span>🚀 Webhook</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Corpo Rolável -->
-      <div class="p-6 overflow-y-auto space-y-5">
-
-        <!-- ABA 1: LINK DO GOOGLE SHEETS OU UPLOAD DE ARQUIVO .XLSX / .CSV -->
-        <div id="sheets-tab-panel-import" class="space-y-4">
-          <div class="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs space-y-1.5">
-            <div class="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-              <i data-lucide="check-circle" class="w-4 h-4"></i>
-              <span>Leitor Dinâmico do Modelo Lado a Lado (Gabriel & Mirela)</span>
-            </div>
-            <p class="text-slate-600 dark:text-slate-300">
-              Extrai automaticamente <strong>SALÁRIO GABRIEL</strong>, <strong>SALÁRIO MIRELA</strong> e as duas tabelas lado a lado (<strong>DESPESAS GABRIEL</strong> e <strong>DESPESAS MIRELA</strong>) até a linha <code>TOTAL DE GASTOS</code> no mês selecionado.
-            </p>
-          </div>
-
-          <!-- Upload Direto de Arquivo .XLSX ou .CSV -->
-          <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div class="text-xs font-bold">📂 Enviar arquivo da planilha (.xlsx, .xls ou .csv)</div>
-              <div class="text-[11px] text-slate-400">Selecione o arquivo salvo do Excel ou Google Planilhas no seu computador</div>
-            </div>
-            <label class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold cursor-pointer transition flex items-center gap-1.5">
-              <i data-lucide="upload" class="w-4 h-4"></i>
-              <span>Escolher Arquivo (.xlsx / .csv)</span>
-              <input type="file" accept=".xlsx,.xls,.csv" onchange="handleSpreadsheetFileUpload(event)" class="hidden" />
-            </label>
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-              Ou cole o Link da Planilha do Google Sheets (Pública ou CSV)
-            </label>
-            <input id="sheets-url-input" type="url"
-              placeholder="https://docs.google.com/spreadsheets/d/SEU_ID_DA_PLANILHA/edit#gid=0"
-              class="w-full px-4 py-2.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-
-          <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
-            <button type="button" onclick="switchSheetsModalTab('paste')"
-              class="text-xs font-semibold text-emerald-500 hover:underline">
-              Prefere copiar e colar as células (Ctrl+V)? Clique aqui &rarr;
-            </button>
-            <button type="button" onclick="syncFromGoogleSheetsUrl(null, true)"
-              class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-md transition">
-              <i data-lucide="download-cloud" class="w-4 h-4"></i>
-              <span>Ler Planilha e Carregar no Mês</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- ABA 2: COLAR CÉLULAS DIRETAMENTE (CTRL+V DO MODELO GABRIEL & MIRELA) -->
-        <div id="sheets-tab-panel-paste" class="hidden space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                Selecione tudo na sua planilha (Ctrl+A / Ctrl+C) e cole aqui (Ctrl+V)
-              </label>
-              <p class="text-[11px] text-slate-400">
-                Detecta os salários no topo e as colunas lado a lado de DESPESAS GABRIEL e DESPESAS MIRELA
-              </p>
-            </div>
-            <button type="button" onclick="fillSampleGoogleSheetsPaste()"
-              class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-500/15 text-purple-500 hover:bg-purple-500/25 transition">
-              ✨ Testar Modelo Gabriel & Mirela
-            </button>
-          </div>
-
-          <textarea id="sheets-paste-textarea" rows="6"
-            oninput="previewPastedSheetCells()"
-            placeholder="Cole aqui as células copiadas da planilha (com SALÁRIO GABRIEL, SALÁRIO MIRELA, DESPESAS GABRIEL e DESPESAS MIRELA)..."
-            class="w-full p-3.5 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
-
-          <!-- Pré-visualização do Mapeamento Inteligente -->
-          <div class="rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 p-3.5">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Leitura Dinâmica (Salários + Despesas Gabriel & Mirela)
-              </span>
-              <span id="sheets-paste-count" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-500">
-                0 despesas
-              </span>
-            </div>
-            <div id="sheets-paste-preview">
-              <div class="text-xs text-slate-400 text-center py-4">
-                Cole acima sua tabela do Google Sheets/Excel para visualizar os salários e gastos detectados.
-              </div>
-            </div>
-          </div>
-
-          <div class="flex justify-end gap-2">
-            <button type="button" onclick="importFromPastedSheetCells()"
-              class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-md transition">
-              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-              <span>Carregar Dinamicamente no Mês Atual</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- ABA 3: ENVIO AUTOMÁTICO DO SITE PARA O GOOGLE PLANILHAS (WEBHOOK) -->
-        <div id="sheets-tab-panel-webhook" class="hidden space-y-4">
-          <form onsubmit="saveWebhookSettings(event)" class="space-y-4">
-            <div>
-              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                URL do Webhook (Google Apps Script Web App)
-              </label>
-              <input id="sheets-webhook-input" type="url"
-                placeholder="https://script.google.com/macros/s/AKfycb.../exec"
-                class="w-full px-4 py-2.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
-            </div>
-
-            <label class="flex items-center gap-2.5 cursor-pointer select-none p-3 rounded-xl bg-slate-100/80 dark:bg-slate-800/60">
-              <input id="sheets-autopush-checkbox" type="checkbox" checked class="w-4 h-4 accent-emerald-600 rounded" />
-              <span class="text-xs font-semibold">
-                Enviar automaticamente cada novo gasto registrado no site para o Google Planilhas
-              </span>
-            </label>
-
-            <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <button type="button" onclick="toggleAppsScriptCodeDrawer()"
-                  class="px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-600/15 hover:bg-purple-600/25 text-purple-600 dark:text-purple-300 border border-purple-500/30 transition flex items-center gap-1.5">
-                  <i data-lucide="code-2" class="w-4 h-4"></i>
-                  <span>Ver Código do Google Apps Script</span>
-                </button>
-                <button type="button" onclick="pushCurrentMonthToGoogleSheets()"
-                  class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-800 hover:opacity-90 transition flex items-center gap-1.5">
-                  <i data-lucide="send" class="w-3.5 h-3.5 text-emerald-500"></i>
-                  <span>Enviar Mês Atual Inteiro</span>
-                </button>
-              </div>
-
-              <button type="submit"
-                class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm transition">
-                Salvar Configuração
-              </button>
-            </div>
-          </form>
-
-          <div id="apps-script-code-drawer" class="hidden space-y-2.5 pt-3 border-t border-slate-200 dark:border-slate-800">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-purple-500">
-                📋 Cole em sua Planilha: Extensões &gt; Apps Script &gt; Implantar como App da Web
-              </span>
-              <button type="button" onclick="copyAppsScriptCode()"
-                class="px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition flex items-center gap-1">
-                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-                <span>Copiar Código</span>
-              </button>
-            </div>
-            <pre id="apps-script-code-content"
-              class="p-3.5 rounded-xl bg-slate-950 text-emerald-300 text-[11px] font-mono overflow-x-auto max-h-60 border border-slate-800"></pre>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- ====================================================================
        LIGHTBOX PARA VISUALIZAR O PRINT ORIGINAL ANEXADO
        ==================================================================== -->
   <div id="receipt-lightbox" onclick="closeReceiptLightbox()"
@@ -1152,6 +922,5 @@
   <script src="env-local.js"></script>
   <script src="ocr-engine.js"></script>
   <script src="app.js"></script>
-  <script src="sheets-sync.js"></script>
 </body>
 </html>

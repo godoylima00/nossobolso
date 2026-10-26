@@ -1429,6 +1429,7 @@ function escapeHtml(str = '') {
 
 function renderSubscriptionsSection() {
   const tbody = document.getElementById('subscriptions-tbody');
+  const cardsContainer = document.getElementById('subscriptions-mobile-cards');
   const totalFixedEl = document.getElementById('subscriptions-total-badge');
   if (!tbody) return;
 
@@ -1441,16 +1442,25 @@ function renderSubscriptionsSection() {
   }
 
   if (appState.subscriptions.length === 0) {
+    const emptyMsg = `Nenhuma assinatura ou despesa fixa cadastrada. Use os campos acima para adicionar cobranças fixas mensais.`;
     tbody.innerHTML = `
       <tr>
         <td colspan="6" class="text-center py-6 text-slate-400 text-sm">
-          Nenhuma assinatura ou despesa fixa cadastrada. Use os campos acima para adicionar cobranças fixas mensais.
+          ${emptyMsg}
         </td>
       </tr>
     `;
+    if (cardsContainer) {
+      cardsContainer.innerHTML = `
+        <div class="text-center py-6 px-4 text-slate-400 text-sm bg-slate-50/50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+          ${emptyMsg}
+        </div>
+      `;
+    }
     return;
   }
 
+  // Desktop Table Rows
   tbody.innerHTML = appState.subscriptions.map(sub => {
     const sec = getSectorMeta(sub.sector);
     const ownerMeta = getOwnerMeta(sub.owner);
@@ -1495,6 +1505,76 @@ function renderSubscriptionsSection() {
       </tr>
     `;
   }).join('');
+
+  // Mobile Card View (< 768px)
+  if (cardsContainer) {
+    cardsContainer.innerHTML = appState.subscriptions.map(sub => {
+      const sec = getSectorMeta(sub.sector);
+      const ownerMeta = getOwnerMeta(sub.owner);
+      const fullAmt = parseAmountValue(sub.amount);
+      const ownerBadgeLabel = ownerMeta.id === 'casal'
+        ? `${ownerMeta.emoji} Casal • ${formatCurrency(fullAmt / 2)} cada`
+        : `${ownerMeta.emoji} ${ownerMeta.label}`;
+      const isEditing = editingSubscriptionId === sub.id;
+
+      return `
+        <div class="p-3.5 rounded-xl border ${
+          isEditing
+            ? 'border-purple-500 bg-purple-500/10 shadow-sm'
+            : 'border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/60 shadow-xs'
+        } flex flex-col gap-2 transition">
+          <!-- Linha 1: Nome da despesa em destaque (bold) e valor no lado direito -->
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-bold text-slate-900 dark:text-white text-sm truncate">${escapeHtml(sub.merchant)}</span>
+            <span class="font-extrabold text-slate-900 dark:text-white text-sm shrink-0">${formatCurrency(fullAmt)}</span>
+          </div>
+
+          <!-- Linha 2: A badge de responsável -->
+          <div class="flex items-center">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ownerMeta.badge}">${ownerBadgeLabel}</span>
+          </div>
+
+          <!-- Linha 3: Dia de vencimento agrupado com badges de Setor e Pagamento -->
+          <div class="flex flex-wrap items-center gap-1.5 text-xs">
+            <span class="px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 font-semibold text-[11px] text-slate-700 dark:text-slate-200">
+              Dia ${String(sub.day).padStart(2, '0')}
+            </span>
+            <span class="badge-sector ${sec.badgeClass} text-[10px]">${sec.emoji} ${sec.shortName}</span>
+            <span class="px-2 py-0.5 rounded-md bg-slate-200/60 dark:bg-slate-700/60 text-[10px] font-medium text-slate-600 dark:text-slate-300">
+              ${escapeHtml(sub.paymentMethod)}
+            </span>
+          </div>
+
+          <!-- Linha 4: Os botões de ação (Editar e Excluir) alinhados à direita no fundo -->
+          <div class="flex items-center justify-between pt-2 mt-0.5 border-t border-slate-200/60 dark:border-slate-700/60 no-print">
+            <button onclick="toggleSubscriptionActive('${sub.id}')"
+              class="px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                sub.active
+                  ? 'bg-emerald-500/15 text-emerald-500'
+                  : 'bg-slate-200 dark:bg-slate-800 text-slate-400'
+              }">
+              ${sub.active ? '● Ativo' : '○ Pausado'}
+            </button>
+            <div class="flex items-center gap-1.5">
+              <button onclick="editSubscription('${sub.id}')"
+                title="Editar Gasto Fixo"
+                class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-500/15 hover:bg-purple-500/25 text-purple-500 transition inline-flex items-center gap-1">
+                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                <span>Editar</span>
+              </button>
+              <button onclick="deleteSubscription('${sub.id}')"
+                title="Excluir Gasto Fixo"
+                class="p-1.5 rounded-lg hover:bg-red-500/15 text-slate-400 hover:text-red-500 transition">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (window.lucide) window.lucide.createIcons();
 }
 
 /* ==========================================================================
@@ -2331,15 +2411,21 @@ window.editSubscription = function(subId) {
   if (paymentInput) paymentInput.value = sub.paymentMethod || 'PIX';
 
   if (submitBtn) {
-    submitBtn.textContent = '💾 Salvar';
-    submitBtn.className = 'px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shrink-0 whitespace-nowrap transition';
+    submitBtn.textContent = '💾 Salvar Alterações';
+    submitBtn.className = 'w-full md:w-auto px-4 py-2.5 md:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shrink-0 whitespace-nowrap transition flex items-center justify-center';
   }
   if (cancelBtn) {
     cancelBtn.classList.remove('hidden');
+    cancelBtn.className = 'w-full md:w-auto px-3.5 py-2.5 md:py-2 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-xs font-bold shrink-0 whitespace-nowrap transition flex items-center justify-center';
   }
 
   renderSubscriptionsSection();
   if (window.lucide) window.lucide.createIcons();
+
+  const subForm = document.getElementById('subscription-form');
+  if (subForm) {
+    subForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 
   if (merchantInput) {
     merchantInput.focus();
@@ -2359,7 +2445,7 @@ window.cancelSubscriptionEdit = function() {
   const cancelBtn = document.getElementById('sub-cancel-btn');
   if (submitBtn) {
     submitBtn.textContent = '+ Fixar';
-    submitBtn.className = 'px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold shrink-0 whitespace-nowrap transition';
+    submitBtn.className = 'w-full md:w-auto px-4 py-2.5 md:py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold shrink-0 whitespace-nowrap transition flex items-center justify-center';
   }
   if (cancelBtn) {
     cancelBtn.classList.add('hidden');

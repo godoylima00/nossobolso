@@ -118,6 +118,43 @@ function loadState() {
         sectorLimits: { ...appState.sectorLimits, ...(parsed.sectorLimits || {}) },
         tableFilters: { ...appState.tableFilters, ...(parsed.tableFilters || {}) }
       };
+
+      // Normaliza retroativamente assinaturas e transações já salvas
+      if (Array.isArray(appState.subscriptions)) {
+        appState.subscriptions = appState.subscriptions.map(sub => ({
+          ...sub,
+          merchant: String(sub.merchant || '').replace(/\s*\(50%\s*Casal\)\s*$/i, '').trim(),
+          owner: (sub.owner || 'casal').toLowerCase().trim(),
+          amount: parseAmountValue(sub.amount)
+        }));
+      }
+      if (Array.isArray(appState.transactions)) {
+        appState.transactions = appState.transactions.map(tx => {
+          const cleanMerchant = String(tx.merchant || '').replace(/\s*\(50%\s*Casal\)\s*$/i, '').trim();
+          let normOwner = (tx.owner || 'casal').toLowerCase().trim();
+          let normAmount = parseAmountValue(tx.amount);
+
+          // Se houver uma assinatura fixa com o mesmo nome ou ID, sincroniza retroativamente
+          const matchedSub = (appState.subscriptions || []).find(
+            s => (tx.subscriptionId && s.id === tx.subscriptionId) ||
+                 (s.merchant && s.merchant.toLowerCase() === cleanMerchant.toLowerCase())
+          );
+          if (matchedSub) {
+            normOwner = matchedSub.owner || normOwner;
+            if (normAmount <= 0 && matchedSub.amount > 0) {
+              normAmount = matchedSub.amount;
+            }
+          }
+
+          return {
+            ...tx,
+            merchant: cleanMerchant,
+            owner: normOwner,
+            amount: normAmount
+          };
+        });
+      }
+      saveState();
     } else {
       saveState();
     }
@@ -138,11 +175,24 @@ function saveState() {
    Formatação e Utilitários
    ========================================================================== */
 
+function parseAmountValue(raw) {
+  if (typeof raw === 'number') return isFinite(raw) ? raw : 0;
+  if (!raw) return 0;
+  let str = String(raw).replace(/R\$\s?/gi, '').trim();
+  if (str.includes(',') && str.includes('.')) {
+    str = str.replace(/\./g, '').replace(',', '.');
+  } else if (str.includes(',')) {
+    str = str.replace(',', '.');
+  }
+  const num = parseFloat(str);
+  return isFinite(num) ? num : 0;
+}
+
 function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL'
-  }).format(Number(value) || 0);
+  }).format(parseAmountValue(value));
 }
 
 function formatDateBR(isoDate = '') {
@@ -208,43 +258,76 @@ function showToast(message, type = 'success') {
    ========================================================================== */
 
 function ensureRecurringTransactionsForMonth(yyyyMM) {
-  let addedCount = 0;
+  let changed = false;
   for (const sub of appState.subscriptions) {
-    if (!sub.active) continue;
     const recurringTxId = `rec_${sub.id}_${yyyyMM}`;
-    const alreadyExists = appState.transactions.some(t => t.id === recurringTxId);
-    if (!alreadyExists) {
-      const dayStr = String(Math.min(28, Math.max(1, Number(sub.day) || 5))).padStart(2, '0');
+    const existingIdx = appState.transactions.findIndex(t => t.id === recurringTxId);
+
+    if (!sub.active) {
+      if (existingIdx !== -1) {
+        appState.transactions.splice(existingIdx, 1);
+        changed = true;
+      }
+      continue;
+    }
+
+    const dayStr = String(Math.min(28, Math.max(1, Number(sub.day) || 5))).padStart(2, '0');
+    const cleanMerchant = String(sub.merchant || '').replace(/\s*\(50%\s*Casal\)\s*$/i, '').trim();
+    const normOwner = (sub.owner || 'casal').toLowerCase().trim();
+    const numAmount = parseAmountValue(sub.amount);
+
+    if (existingIdx === -1) {
       appState.transactions.push({
         id: recurringTxId,
         date: `${yyyyMM}-${dayStr}`,
         time: '08:00',
-        merchant: sub.merchant,
-        owner: sub.owner || 'casal',
-        sector: sub.sector,
+        merchant: cleanMerchant,
+        owner: normOwner,
+        sector: sub.sector || 'mercado',
         paymentMethod: sub.paymentMethod || 'PIX',
-        amount: Number(sub.amount) || 0,
+        amount: numAmount,
         imageDataUrl: null,
         imageSignature: null,
         isRecurring: true,
         subscriptionId: sub.id
       });
-      addedCount++;
+      changed = true;
+    } else {
+      const curr = appState.transactions[existingIdx];
+      if (
+        curr.merchant !== cleanMerchant ||
+        curr.owner !== normOwner ||
+        parseAmountValue(curr.amount) !== numAmount ||
+        curr.sector !== (sub.sector || 'mercado') ||
+        curr.paymentMethod !== (sub.paymentMethod || 'PIX')
+      ) {
+        appState.transactions[existingIdx] = {
+          ...curr,
+          merchant: cleanMerchant,
+          owner: normOwner,
+          sector: sub.sector || 'mercado',
+          paymentMethod: sub.paymentMethod || 'PIX',
+          amount: numAmount,
+          isRecurring: true,
+          subscriptionId: sub.id
+        };
+        changed = true;
+      }
     }
   }
-  if (addedCount > 0) {
+  if (changed) {
     saveState();
   }
 }
 
 /* ==========================================================================
-   Cálculos Dinâmicos do Mês (Gabriel, Mirela e Casal Juntos)
+   Cálculos Dinâmicos do Mês (Gabriel, Mirela e Casal Juntos - Divisão 50/50)
    ========================================================================== */
 
 function getMonthSalaries(yyyyMM = appState.currentMonth) {
   const entry = appState.monthlySalaries?.[yyyyMM] || { gabriel: 0, mirela: 0 };
-  const gabriel = Number(entry.gabriel) || 0;
-  const mirela = Number(entry.mirela) || 0;
+  const gabriel = parseAmountValue(entry.gabriel);
+  const mirela = parseAmountValue(entry.mirela);
   return {
     gabriel,
     mirela,
@@ -280,25 +363,59 @@ function calculateMonthlySummary(yyyyMM = appState.currentMonth) {
   });
 
   for (const tx of txs) {
-    const val = Number(tx.amount) || 0;
+    const val = parseAmountValue(tx.amount);
+    const cleanMerchant = String(tx.merchant || '').replace(/\s*\(50%\s*Casal\)\s*$/i, '').trim();
+    const normOwner = (tx.owner || 'casal').toLowerCase().trim();
+
     totalExpense += val;
 
-    if (tx.owner === 'gabriel') {
+    if (normOwner === 'gabriel') {
       expensesGabriel += val;
-      gabrielTransactions.push(tx);
-    } else if (tx.owner === 'mirela') {
+      gabrielTransactions.push({
+        ...tx,
+        amount: val,
+        displayAmount: val,
+        displayMerchant: cleanMerchant,
+        isSharedCouple: false
+      });
+    } else if (normOwner === 'mirela') {
       expensesMirela += val;
-      mirelaTransactions.push(tx);
+      mirelaTransactions.push({
+        ...tx,
+        amount: val,
+        displayAmount: val,
+        displayMerchant: cleanMerchant,
+        isSharedCouple: false
+      });
     } else {
+      // Despesa marcada como "Casal": divide 50/50 entre Gabriel e Mirela
+      const halfVal = val / 2;
       expensesCasalShared += val;
-      // Também exibe na lista correspondente ou em ambos
-      gabrielTransactions.push(tx);
+      expensesGabriel += halfVal;
+      expensesMirela += halfVal;
+
+      const sharedItem = {
+        ...tx,
+        owner: 'casal',
+        amount: val,
+        displayAmount: halfVal,
+        fullCoupleAmount: val,
+        displayMerchant: `${cleanMerchant} (50% Casal)`,
+        isSharedCouple: true
+      };
+      gabrielTransactions.push(sharedItem);
+      mirelaTransactions.push(sharedItem);
     }
 
     const secId = bySector[tx.sector] ? tx.sector : 'compras';
     bySector[secId].total += val;
     bySector[secId].count += 1;
-    bySector[secId].transactions.push(tx);
+    bySector[secId].transactions.push({
+      ...tx,
+      merchant: cleanMerchant,
+      owner: normOwner === 'gabriel' || normOwner === 'mirela' ? normOwner : 'casal',
+      amount: val
+    });
   }
 
   let topVillain = null;
@@ -488,6 +605,9 @@ function renderCoupleHorizontalBoards(summary) {
 
   const buildPersonBoardHtml = (personKey, title, emoji, accentBorder, salaryVal, totalSpent, balanceVal, txs) => {
     const isHorizontalItems = appState.itemsDisplayMode === 'horizontal';
+    const computedTotalSpent = txs.reduce((acc, tx) => acc + parseAmountValue(tx.displayAmount ?? tx.amount), 0);
+    const finalTotalSpent = computedTotalSpent > 0 ? computedTotalSpent : parseAmountValue(totalSpent);
+    const finalBalanceVal = parseAmountValue(salaryVal) - finalTotalSpent;
 
     return `
       <div class="card-surface flex-1 min-w-[340px] flex flex-col justify-between overflow-hidden">
@@ -532,12 +652,14 @@ function renderCoupleHorizontalBoards(summary) {
             <div class="horizontal-items-grid">
               ${txs.map(tx => {
                 const sec = getSectorMeta(tx.sector);
+                const labelMerchant = tx.displayMerchant || tx.merchant;
+                const shownAmount = tx.displayAmount ?? tx.amount;
                 return `
                   <div class="horizontal-item-pill">
                     <div class="flex items-start justify-between gap-2 mb-2">
                       <div class="min-w-0">
-                        <div class="font-bold text-sm text-slate-900 dark:text-white truncate" title="${escapeHtml(tx.merchant)}">
-                          ${escapeHtml(tx.merchant)}
+                        <div class="font-bold text-sm text-slate-900 dark:text-white truncate" title="${escapeHtml(labelMerchant)}">
+                          ${escapeHtml(labelMerchant)}
                         </div>
                         <span class="inline-flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
                           ${sec.emoji} ${sec.shortName}
@@ -559,7 +681,7 @@ function renderCoupleHorizontalBoards(summary) {
                     </div>
                     <div class="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800/80">
                       <span class="text-[11px] text-slate-400">${escapeHtml(tx.paymentMethod || 'PIX')}</span>
-                      <span class="text-sm font-extrabold text-red-500">${formatCurrency(tx.amount)}</span>
+                      <span class="text-sm font-extrabold text-red-500">${formatCurrency(shownAmount)}</span>
                     </div>
                   </div>
                 `;
@@ -579,11 +701,13 @@ function renderCoupleHorizontalBoards(summary) {
                 <tbody>
                   ${txs.map(tx => {
                     const sec = getSectorMeta(tx.sector);
+                    const labelMerchant = tx.displayMerchant || tx.merchant;
+                    const shownAmount = tx.displayAmount ?? tx.amount;
                     return `
                       <tr>
-                        <td class="font-bold text-slate-900 dark:text-white">${escapeHtml(tx.merchant)}</td>
+                        <td class="font-bold text-slate-900 dark:text-white">${escapeHtml(labelMerchant)}</td>
                         <td><span class="badge-sector ${sec.badgeClass}">${sec.emoji} ${sec.shortName}</span></td>
-                        <td class="text-right font-extrabold text-red-500 whitespace-nowrap">${formatCurrency(tx.amount)}</td>
+                        <td class="text-right font-extrabold text-red-500 whitespace-nowrap">${formatCurrency(shownAmount)}</td>
                         <td class="text-right whitespace-nowrap no-print">
                           <button onclick="editTransaction('${tx.id}')" class="p-1 text-slate-400 hover:text-white"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
                           <button onclick="deleteTransaction('${tx.id}')" class="p-1 text-slate-400 hover:text-red-500"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
@@ -603,12 +727,12 @@ function renderCoupleHorizontalBoards(summary) {
             <span class="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
               TOTAL DE GASTOS (${txs.length} ${txs.length === 1 ? 'item' : 'itens'})
             </span>
-            <span class="text-lg font-extrabold text-red-500">${formatCurrency(totalSpent)}</span>
+            <span class="text-lg font-extrabold text-red-500">${formatCurrency(finalTotalSpent)}</span>
           </div>
           <div class="text-right">
             <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block">Saldo Livre Individual</span>
-            <span class="text-base font-extrabold ${balanceVal >= 0 ? 'text-emerald-500' : 'text-red-500'}">
-              ${formatCurrency(balanceVal)}
+            <span class="text-base font-extrabold ${finalBalanceVal >= 0 ? 'text-emerald-500' : 'text-red-500'}">
+              ${formatCurrency(finalBalanceVal)}
             </span>
           </div>
         </div>
@@ -799,12 +923,16 @@ function renderSectorTables(summary) {
             <div class="horizontal-items-strip">
               ${rows.map(tx => {
                 const ownerMeta = getOwnerMeta(tx.owner);
+                const fullAmt = parseAmountValue(tx.amount);
+                const ownerBadgeLabel = ownerMeta.id === 'casal'
+                  ? `${ownerMeta.emoji} Casal • ${formatCurrency(fullAmt / 2)} cada`
+                  : `${ownerMeta.emoji} ${ownerMeta.label}`;
                 return `
                   <div class="horizontal-item-pill">
                     <div>
                       <div class="flex items-center justify-between gap-1 mb-1">
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ownerMeta.badge}">
-                          ${ownerMeta.emoji} ${ownerMeta.label}
+                          ${ownerBadgeLabel}
                         </span>
                         <div class="flex items-center gap-0.5 no-print">
                           ${tx.imageDataUrl ? `
@@ -826,7 +954,7 @@ function renderSectorTables(summary) {
                     </div>
                     <div class="flex items-center justify-between mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-800">
                       <span class="text-[11px] text-slate-400">${formatDateBR(tx.date).slice(0, 5)} • ${escapeHtml(tx.paymentMethod || 'PIX')}</span>
-                      <span class="text-sm font-extrabold text-red-500">${formatCurrency(tx.amount)}</span>
+                      <span class="text-sm font-extrabold text-red-500">${formatCurrency(fullAmt)}</span>
                     </div>
                   </div>
                 `;
@@ -846,11 +974,15 @@ function renderSectorTables(summary) {
                 <tbody>
                   ${rows.map(tx => {
                     const ownerMeta = getOwnerMeta(tx.owner);
+                    const fullAmt = parseAmountValue(tx.amount);
+                    const ownerBadgeLabel = ownerMeta.id === 'casal'
+                      ? `Casal • ${formatCurrency(fullAmt / 2)} cada`
+                      : ownerMeta.label;
                     return `
                       <tr>
-                        <td><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ownerMeta.badge}">${ownerMeta.label}</span></td>
+                        <td><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ownerMeta.badge}">${ownerBadgeLabel}</span></td>
                         <td class="font-semibold">${escapeHtml(tx.merchant)}</td>
-                        <td class="text-right font-bold text-red-500 whitespace-nowrap">${formatCurrency(tx.amount)}</td>
+                        <td class="text-right font-bold text-red-500 whitespace-nowrap">${formatCurrency(fullAmt)}</td>
                         <td class="text-right whitespace-nowrap no-print">
                           <button onclick="editTransaction('${tx.id}')" class="p-1 text-slate-400 hover:text-white"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
                           <button onclick="deleteTransaction('${tx.id}')" class="p-1 text-slate-400 hover:text-red-500"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
@@ -993,17 +1125,23 @@ function renderCharts(summary, prevSummary) {
         }
       });
     } else {
-      // Comparativo Gabriel vs Mirela por Setor no Mês Atual
+      // Comparativo Gabriel vs Mirela por Setor no Mês Atual (incluindo 50% de cada gasto do Casal)
       const labels = SECTORS.map(s => s.shortName);
       const gabrielBySec = SECTORS.map(s =>
-        summary.bySector[s.id].transactions
-          .filter(t => t.owner === 'gabriel')
-          .reduce((acc, t) => acc + (Number(t.amount) || 0), 0)
+        summary.bySector[s.id].transactions.reduce((acc, t) => {
+          const amt = parseAmountValue(t.amount);
+          if (t.owner === 'gabriel') return acc + amt;
+          if (t.owner !== 'mirela') return acc + (amt / 2);
+          return acc;
+        }, 0)
       );
       const mirelaBySec = SECTORS.map(s =>
-        summary.bySector[s.id].transactions
-          .filter(t => t.owner === 'mirela')
-          .reduce((acc, t) => acc + (Number(t.amount) || 0), 0)
+        summary.bySector[s.id].transactions.reduce((acc, t) => {
+          const amt = parseAmountValue(t.amount);
+          if (t.owner === 'mirela') return acc + amt;
+          if (t.owner !== 'gabriel') return acc + (amt / 2);
+          return acc;
+        }, 0)
       );
 
       barChartInstance = new Chart(barCtx, {
@@ -1088,16 +1226,20 @@ function renderSubscriptionsSection() {
   tbody.innerHTML = appState.subscriptions.map(sub => {
     const sec = getSectorMeta(sub.sector);
     const ownerMeta = getOwnerMeta(sub.owner);
+    const fullAmt = parseAmountValue(sub.amount);
+    const ownerBadgeLabel = ownerMeta.id === 'casal'
+      ? `${ownerMeta.emoji} Casal • ${formatCurrency(fullAmt / 2)} cada`
+      : `${ownerMeta.emoji} ${ownerMeta.label}`;
     return `
       <tr>
         <td class="font-semibold">Dia ${String(sub.day).padStart(2, '0')}</td>
         <td>
-          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ownerMeta.badge}">${ownerMeta.emoji} ${ownerMeta.label}</span>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ownerMeta.badge}">${ownerBadgeLabel}</span>
           <span class="font-bold text-slate-900 dark:text-white ml-1.5">${escapeHtml(sub.merchant)}</span>
         </td>
         <td><span class="badge-sector ${sec.badgeClass}">${sec.emoji} ${sec.shortName}</span></td>
         <td>${escapeHtml(sub.paymentMethod)}</td>
-        <td class="text-right font-bold">${formatCurrency(sub.amount)}</td>
+        <td class="text-right font-bold">${formatCurrency(fullAmt)}</td>
         <td class="text-right">
           <div class="inline-flex items-center gap-2">
             <button onclick="toggleSubscriptionActive('${sub.id}')"
@@ -1352,10 +1494,11 @@ window.autoClassifyConfirmMerchant = function(merchantVal) {
 window.saveConfirmedTransaction = function(e) {
   if (e) e.preventDefault();
 
-  const amount = parseFloat(String(document.getElementById('confirm-amount').value).replace(',', '.'));
+  const amount = parseAmountValue(document.getElementById('confirm-amount').value);
   const date = document.getElementById('confirm-date').value;
   const time = document.getElementById('confirm-time').value || '12:00';
-  const merchant = document.getElementById('confirm-merchant').value.trim() || 'Despesa Registrada';
+  const rawMerchant = document.getElementById('confirm-merchant').value.trim() || 'Despesa Registrada';
+  const merchant = rawMerchant.replace(/\s*\(50%\s*Casal\)\s*$/i, '').trim();
   const sector = document.getElementById('confirm-sector').value;
   const paymentMethod = document.getElementById('confirm-payment').value;
   const owner = document.getElementById('confirm-owner')?.value || 'gabriel';
@@ -1368,8 +1511,9 @@ window.saveConfirmedTransaction = function(e) {
   if (pendingReceiptData.editingId) {
     const idx = appState.transactions.findIndex(t => t.id === pendingReceiptData.editingId);
     if (idx !== -1) {
+      const existingTx = appState.transactions[idx];
       appState.transactions[idx] = {
-        ...appState.transactions[idx],
+        ...existingTx,
         amount,
         date,
         time,
@@ -1377,9 +1521,27 @@ window.saveConfirmedTransaction = function(e) {
         owner,
         sector,
         paymentMethod,
-        imageDataUrl: pendingReceiptData.imageDataUrl ?? appState.transactions[idx].imageDataUrl,
-        imageSignature: pendingReceiptData.imageSignature ?? appState.transactions[idx].imageSignature
+        imageDataUrl: pendingReceiptData.imageDataUrl ?? existingTx.imageDataUrl,
+        imageSignature: pendingReceiptData.imageSignature ?? existingTx.imageSignature
       };
+
+      // Se for uma despesa recorrente vinculada a uma assinatura fixa, sincroniza a assinatura também
+      if (existingTx.subscriptionId) {
+        const subIdx = appState.subscriptions.findIndex(s => s.id === existingTx.subscriptionId);
+        if (subIdx !== -1) {
+          const dayNum = parseInt((date || '').split('-')[2], 10);
+          appState.subscriptions[subIdx] = {
+            ...appState.subscriptions[subIdx],
+            merchant,
+            amount,
+            owner,
+            sector,
+            paymentMethod,
+            day: !isNaN(dayNum) ? Math.min(28, Math.max(1, dayNum)) : appState.subscriptions[subIdx].day
+          };
+        }
+      }
+
       showToast('Lançamento atualizado com sucesso!');
     }
   } else {
@@ -1454,7 +1616,11 @@ window.editTransaction = function(txId) {
   };
 
   document.getElementById('scan-modal').classList.remove('hidden');
-  openConfirmStepWithData(tx);
+  openConfirmStepWithData({
+    ...tx,
+    merchant: String(tx.merchant || '').replace(/\s*\(50%\s*Casal\)\s*$/i, '').trim(),
+    amount: parseAmountValue(tx.amount)
+  });
 };
 
 window.deleteTransaction = function(txId) {
@@ -1462,6 +1628,12 @@ window.deleteTransaction = function(txId) {
   if (idx === -1) return;
   const removed = appState.transactions[idx];
   appState.transactions.splice(idx, 1);
+
+  // Se for um lançamento gerado por gasto fixo recorrente, remove também da lista de fixos para não recriar
+  if (removed.isRecurring && removed.subscriptionId) {
+    appState.subscriptions = appState.subscriptions.filter(s => s.id !== removed.subscriptionId);
+  }
+
   saveState();
   renderAll();
   showToast(`Despesa "${removed.merchant}" removida.`, 'info');

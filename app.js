@@ -225,7 +225,7 @@ function updateCloudStatusUI({ status, message }) {
   if (status === 'connected') {
     if (bannerUnconf) bannerUnconf.classList.add('hidden');
     if (badgeDot) badgeDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
-    if (badgeText) badgeText.textContent = '☁️ Nuvem ativa (Tempo Real)';
+    if (badgeText) badgeText.textContent = '⚡ Supabase ativo (Tempo Real)';
     return;
   }
 
@@ -233,7 +233,7 @@ function updateCloudStatusUI({ status, message }) {
     if (bannerUnconf) bannerUnconf.classList.remove('hidden');
     if (unconfText) {
       unconfText.textContent =
-        message || 'Banco de Dados não configurado. Adicione suas chaves no arquivo .env';
+        message || 'Banco de Dados não configurado. Adicione suas chaves do Supabase no arquivo .env';
     }
     if (badgeDot) badgeDot.className = 'w-2 h-2 rounded-full bg-amber-400';
     if (badgeText) badgeText.textContent = '⚠️ Modo Local (.env pendente)';
@@ -241,13 +241,13 @@ function updateCloudStatusUI({ status, message }) {
 }
 
 /**
- * Inicializa a sincronização em Tempo Real (Firebase Firestore) com fallback automático para localStorage
+ * Inicializa a sincronização em Tempo Real (Supabase) com fallback automático para localStorage
  */
 function initCloudPersistence() {
   if (!window.CloudDB || typeof window.CloudDB.initCloudDatabase !== 'function') {
     updateCloudStatusUI({
       status: 'unconfigured',
-      message: 'Banco de Dados não configurado. Adicione suas chaves no arquivo .env'
+      message: 'Banco de Dados não configurado. Adicione suas chaves do Supabase no arquivo .env'
     });
     return;
   }
@@ -2737,16 +2737,12 @@ window.openSettingsModal = function() {
   const geminiInput = document.getElementById('settings-gemini-key');
   if (geminiInput) geminiInput.value = currentKey;
 
-  if (window.CloudDB && typeof window.CloudDB.getStoredFirebaseConfig === 'function') {
-    const fbCfg = window.CloudDB.getStoredFirebaseConfig();
-    const apiEl = document.getElementById('settings-fb-api-key');
-    const projEl = document.getElementById('settings-fb-project-id');
-    const authEl = document.getElementById('settings-fb-auth-domain');
-    const appEl = document.getElementById('settings-fb-app-id');
-    if (apiEl) apiEl.value = fbCfg.apiKey || '';
-    if (projEl) projEl.value = fbCfg.projectId || '';
-    if (authEl) authEl.value = fbCfg.authDomain || '';
-    if (appEl) appEl.value = fbCfg.appId || '';
+  if (window.CloudDB && typeof window.CloudDB.getStoredSupabaseConfig === 'function') {
+    const sbCfg = window.CloudDB.getStoredSupabaseConfig();
+    const urlEl = document.getElementById('settings-sb-url');
+    const anonEl = document.getElementById('settings-sb-anon-key');
+    if (urlEl) urlEl.value = sbCfg.url || '';
+    if (anonEl) anonEl.value = sbCfg.anonKey || '';
   }
 
   document.getElementById('settings-modal').classList.remove('hidden');
@@ -2757,18 +2753,13 @@ window.saveSettingsModal = function(e) {
   const keyVal = document.getElementById('settings-gemini-key')?.value.trim() || '';
   localStorage.setItem('godoyfin_gemini_api_key', keyVal);
 
-  const fbApiKey = document.getElementById('settings-fb-api-key')?.value.trim() || '';
-  const fbProjectId = document.getElementById('settings-fb-project-id')?.value.trim() || '';
-  const fbAuthDomain = document.getElementById('settings-fb-auth-domain')?.value.trim() || '';
-  const fbAppId = document.getElementById('settings-fb-app-id')?.value.trim() || '';
+  const sbUrl = document.getElementById('settings-sb-url')?.value.trim() || '';
+  const sbAnonKey = document.getElementById('settings-sb-anon-key')?.value.trim() || '';
 
-  if (window.CloudDB && typeof window.CloudDB.saveFirebaseConfigFromUI === 'function') {
-    window.CloudDB.saveFirebaseConfigFromUI({
-      VITE_FIREBASE_API_KEY: fbApiKey,
-      VITE_FIREBASE_PROJECT_ID: fbProjectId,
-      VITE_FIREBASE_AUTH_DOMAIN: fbAuthDomain || (fbProjectId ? `${fbProjectId}.firebaseapp.com` : ''),
-      VITE_FIREBASE_STORAGE_BUCKET: fbProjectId ? `${fbProjectId}.appspot.com` : '',
-      VITE_FIREBASE_APP_ID: fbAppId
+  if (window.CloudDB && typeof window.CloudDB.saveSupabaseConfigFromUI === 'function') {
+    window.CloudDB.saveSupabaseConfigFromUI({
+      VITE_SUPABASE_URL: sbUrl,
+      VITE_SUPABASE_ANON_KEY: sbAnonKey
     });
   }
 
@@ -2778,14 +2769,14 @@ window.saveSettingsModal = function(e) {
 
 window.forceSyncLocalToCloud = async function() {
   if (!window.CloudDB || !window.CloudDB.isConfigured()) {
-    showToast('Configure primeiro as chaves do Firebase (.env ou nos campos acima) antes de sincronizar.', 'warning');
+    showToast('Configure primeiro as chaves do Supabase (.env ou nos campos acima) antes de sincronizar.', 'warning');
     return;
   }
   const ok = await window.CloudDB.syncFullStateToCloud(appState);
   if (ok) {
-    showToast('Todos os dados locais foram enviados para a nuvem com sucesso!', 'success');
+    showToast('Todos os dados locais foram enviados para o Supabase com sucesso!', 'success');
   } else {
-    showToast('Erro ao enviar dados para a nuvem. Verifique as regras do Firestore.', 'danger');
+    showToast('Erro ao enviar dados para o Supabase. Verifique se o script SQL foi executado.', 'danger');
   }
 };
 

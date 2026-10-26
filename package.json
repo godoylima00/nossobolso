@@ -1,9 +1,9 @@
 {
   "name": "nossobolso",
-  "version": "1.1.0",
-  "description": "Nosso Bolso - Controle Financeiro Pessoal em Tempo Real (Gabriel & Mirela)",
+  "version": "1.2.0",
+  "description": "Nosso Bolso - Controle Financeiro Pessoal em Tempo Real com Supabase (Gabriel & Mirela)",
   "private": true,
   "dependencies": {
-    "firebase": "^11.0.2"
+    "@supabase/supabase-js": "^2.48.0"
   }
 }

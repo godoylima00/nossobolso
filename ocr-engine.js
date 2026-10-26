@@ -332,7 +332,7 @@ async function extractTextFromPDFDataUrl(pdfDataUrl, onProgress = () => {}) {
     const page = await pdfDoc.getPage(pageNum);
     const textContent = await page.getTextContent();
 
-    // Agrupa fragmentos de texto pela coordenada Y (tolerância de 3.2 unidades)
+    // Agrupa fragmentos de texto pela coordenada Y (tolerância de 4.2 unidades para evitar quebra de colunas na mesma linha)
     const rowsByY = [];
     for (const item of textContent.items) {
       const str = (item.str || '').trim();
@@ -340,7 +340,7 @@ async function extractTextFromPDFDataUrl(pdfDataUrl, onProgress = () => {}) {
       const x = item.transform ? item.transform[4] : 0;
       const y = item.transform ? item.transform[5] : 0;
 
-      let existingRow = rowsByY.find(r => Math.abs(r.y - y) <= 3.2);
+      let existingRow = rowsByY.find(r => Math.abs(r.y - y) <= 4.2);
       if (!existingRow) {
         existingRow = { y, items: [] };
         rowsByY.push(existingRow);
@@ -363,6 +363,23 @@ async function extractTextFromPDFDataUrl(pdfDataUrl, onProgress = () => {}) {
 }
 
 /**
+ * Limpa colunas de cotação/moeda ("0,00", "BRL", "USD", "R$ 0,00") que possam ter grudado no histórico do PDF
+ */
+function sanitizeInvoiceDescription(rawDesc = '') {
+  let d = String(rawDesc || '')
+    .replace(/\b(?:BRL|USD|US\$|R\$)\b/gi, ' ')
+    .replace(/(?:^|\s+)-?0[,\.]00{1,2}(?=\s|$)/g, ' ')
+    .replace(/\s+(?:-?\d{1,3}(?:\.\d{3})*,\d{2,4}|\d+,\d{2,4})\s*$/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!/[A-Za-zÀ-ÿ]{2,}/.test(d)) {
+    return '';
+  }
+  return d;
+}
+
+/**
  * Aplica as Regras Inteligentes da Fatura Bradesco Cartões sobre uma lista bruta de lançamentos
  * (seja vinda do Gemini Vision ou do parser de texto PDF.js)
  */
@@ -373,9 +390,13 @@ function postProcessInvoiceItems(rawItems = [], defaultMonthStr = '2026-10', hol
 
   const cleaned = [];
   const reversals = [];
+  const autoGroupedFees = [];
 
   for (const raw of rawItems) {
-    const originalDesc = String(raw.historico || raw.descricao || raw.merchant || '').replace(/\s+/g, ' ').trim();
+    const rawDescText = String(raw.historico || raw.descricao || raw.merchant || '').replace(/\s+/g, ' ').trim();
+    const originalDesc = sanitizeInvoiceDescription(rawDescText);
+
+    // Ignora caso o campo de nome tenha vindo vazio ou apenas "0,00" / "BRL"
     if (!originalDesc || originalDesc.length < 2) continue;
 
     // Regra 2: Ignorar Linhas de Controle Bancário (SALDO ANTERIOR, PAGTO. POR DEB EM C/C, Totais)
@@ -420,6 +441,17 @@ function postProcessInvoiceItems(rawItems = [], defaultMonthStr = '2026-10', hol
     // Classifica o estabelecimento segundo as regras Bradesco Cartões
     const classification = classifyBradescoStatementItem(originalDesc, defaultOwner);
 
+    // Agrupa automaticamente IOF e ENCARGOS SOBRE PARCELADO em "Taxas & IOF da Fatura"
+    if (/encargos\s+sobre\s+parcelado|iof\s+diario|iof\s+adicional|\biof\b/i.test(originalDesc)) {
+      autoGroupedFees.push({
+        date: isoDate,
+        originalDescription: originalDesc,
+        amount: absVal,
+        owner: defaultOwner
+      });
+      continue;
+    }
+
     // Se o Gemini enviou um responsável explícito ou setor, combina com a regra determinística
     let owner = classification.suggestedOwner;
     if (raw.responsavel && /mirela/i.test(String(raw.responsavel))) {
@@ -448,6 +480,26 @@ function postProcessInvoiceItems(rawItems = [], defaultMonthStr = '2026-10', hol
       paymentMethod: 'Cartão de Crédito',
       needsReview,
       isFeeOrTax: classification.isFeeOrTax,
+      isReversed: false,
+      reversalNote: '',
+      included: true
+    });
+  }
+
+  // Consolida IOF e ENCARGOS SOBRE PARCELADO em um único lançamento "Taxas & IOF da Fatura"
+  if (autoGroupedFees.length > 0) {
+    const totalFeesAmt = autoGroupedFees.reduce((acc, f) => acc + f.amount, 0);
+    cleaned.push({
+      id: 'inv_item_fees_' + Date.now(),
+      date: autoGroupedFees[0].date,
+      originalDescription: `${autoGroupedFees.length} lançamento(s): ${autoGroupedFees.map(f => f.originalDescription).slice(0, 3).join(', ')}`,
+      merchant: 'Taxas & IOF da Fatura',
+      amount: Number(totalFeesAmt.toFixed(2)),
+      owner: defaultOwner,
+      sector: 'compras',
+      paymentMethod: 'Cartão de Crédito',
+      needsReview: false,
+      isFeeOrTax: true,
       isReversed: false,
       reversalNote: '',
       included: true
@@ -501,31 +553,56 @@ function parseBradescoStatementText(rawText = '', defaultMonthStr = '2026-10') {
 
   // Regex que captura linhas no padrão de fatura:
   // Ex: "12/09  UBER * PENDING SAO PAULO   0,00   24,90" ou "15/09  JIM.COM MARIA EDUARDA SIL  531,86"
-  // Ou "21/09  REVERSAO DE COMPRA A VIST  -531,86"
-  const lineRegex = /^(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s+(.+?)\s+(-?\s*\d{1,3}(?:\.\d{3})*,\d{2}-?|-?\s*\d+,\d{2}-?)$/;
+  const lineRegex = /^(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)?\s*(.+?)\s+(-?\s*\d{1,3}(?:\.\d{3})*,\d{2}-?|-?\s*\d+,\d{2}-?)$/;
 
-  for (const line of lines) {
+  let lastKnownDate = '10/10';
+  let pendingOrphanText = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (IGNORED_STATEMENT_LINE_PATTERNS.some(rx => rx.test(line))) {
+      pendingOrphanText = '';
       continue;
+    }
+
+    const dateAtStart = line.match(/^(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/);
+    if (dateAtStart) {
+      lastKnownDate = dateAtStart[1];
     }
 
     const match = line.match(lineRegex);
     if (match) {
-      const datePart = match[1].trim();
-      let descPart = match[2].trim();
+      const datePart = (match[1] || lastKnownDate).trim();
+      let rawMiddle = (match[2] || '').trim();
       const valPart = match[3].trim();
 
-      // Remove colunas finais de moeda/cotação se estiverem grudadas no final da descrição (ex: "USD 0,00 0,00")
-      descPart = descPart
-        .replace(/\s+(?:USD|BRL|R\$|US\$)?\s*\d+,\d{2}(?:\s+\d+,\d{2,4})?$/i, '')
-        .trim();
+      let cleanDesc = sanitizeInvoiceDescription(rawMiddle);
 
-      if (descPart.length >= 2 && !IGNORED_STATEMENT_LINE_PATTERNS.some(rx => rx.test(descPart))) {
+      // Se a linha quebrou no PDF (ex: "15/10 0,00 18,45" e o nome "ENCARGOS SOBRE PARCELADO" estava na linha anterior/seguinte)
+      if (!cleanDesc && pendingOrphanText) {
+        cleanDesc = pendingOrphanText;
+        pendingOrphanText = '';
+      } else if (!cleanDesc && i + 1 < lines.length) {
+        const nextLine = lines[i + 1];
+        if (!/\d+,\d{2}\s*$/.test(nextLine) && /[A-Za-zÀ-ÿ]{3,}/.test(nextLine)) {
+          cleanDesc = sanitizeInvoiceDescription(nextLine.replace(/^\d{1,2}\/\d{1,2}\s*/, ''));
+          if (cleanDesc) i++; // Consome a linha seguinte
+        }
+      }
+
+      if (cleanDesc && cleanDesc.length >= 2 && !IGNORED_STATEMENT_LINE_PATTERNS.some(rx => rx.test(cleanDesc))) {
         extractedRows.push({
           data: datePart,
-          historico: descPart,
+          historico: cleanDesc,
           valor: valPart
         });
+        pendingOrphanText = '';
+      }
+    } else {
+      // Linha somente de texto (sem valor monetário no final): guarda como possível descrição quebrada
+      const candidateText = sanitizeInvoiceDescription(line.replace(/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*/, ''));
+      if (candidateText && candidateText.length >= 3 && !/^(data|historico|moeda|cotacao|parcela|cartao)/i.test(candidateText)) {
+        pendingOrphanText = candidateText;
       }
     }
   }

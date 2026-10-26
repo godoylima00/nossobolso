@@ -83,6 +83,11 @@ let appState = {
   },
   subscriptions: [],
   transactions: [],
+  dismissedRecurringByMonth: {},
+  personBoardState: {
+    gabriel: { sectorFilter: 'all', collapsedSectors: {} },
+    mirela: { sectorFilter: 'all', collapsedSectors: {} }
+  },
   tableFilters: {
     mercado: { search: '', sort: 'recent', payment: 'all', collapsed: false },
     compras: { search: '', sort: 'recent', payment: 'all', collapsed: false },
@@ -124,6 +129,17 @@ function loadState() {
         ...appState,
         ...parsed,
         monthlySalaries: parsed.monthlySalaries || {},
+        dismissedRecurringByMonth: parsed.dismissedRecurringByMonth || {},
+        personBoardState: {
+          gabriel: {
+            sectorFilter: parsed.personBoardState?.gabriel?.sectorFilter || 'all',
+            collapsedSectors: parsed.personBoardState?.gabriel?.collapsedSectors || {}
+          },
+          mirela: {
+            sectorFilter: parsed.personBoardState?.mirela?.sectorFilter || 'all',
+            collapsedSectors: parsed.personBoardState?.mirela?.collapsedSectors || {}
+          }
+        },
         sectorLimits: { ...appState.sectorLimits, ...(parsed.sectorLimits || {}) },
         tableFilters: { ...appState.tableFilters, ...(parsed.tableFilters || {}) }
       };
@@ -139,7 +155,11 @@ function loadState() {
       }
       if (Array.isArray(appState.transactions)) {
         appState.transactions = appState.transactions.map(tx => {
-          const cleanMerchant = String(tx.merchant || '').replace(/\s*\(50%\s*Casal\)\s*$/i, '').trim();
+          let cleanMerchant = String(tx.merchant || '').replace(/\s*\(50%\s*Casal\)\s*$/i, '').trim();
+          // Corrige itens antigos salvos com nome "0,00", "BRL" ou vazios vindos de linhas quebradas do PDF
+          if (!cleanMerchant || /^(?:R\$\s*)?0[.,]00$/i.test(cleanMerchant) || /^[\d.,\s+-]+$/.test(cleanMerchant) || /^(?:BRL|USD|US\$)$/i.test(cleanMerchant)) {
+            cleanMerchant = 'Taxas & IOF da Fatura';
+          }
           let normOwner = (tx.owner || 'casal').toLowerCase().trim();
           let normAmount = parseAmountValue(tx.amount);
 
@@ -268,11 +288,12 @@ function showToast(message, type = 'success') {
 
 function ensureRecurringTransactionsForMonth(yyyyMM) {
   let changed = false;
+  const dismissedList = appState.dismissedRecurringByMonth?.[yyyyMM] || [];
   for (const sub of appState.subscriptions) {
     const recurringTxId = `rec_${sub.id}_${yyyyMM}`;
     const existingIdx = appState.transactions.findIndex(t => t.id === recurringTxId);
 
-    if (!sub.active) {
+    if (!sub.active || dismissedList.includes(sub.id)) {
       if (existingIdx !== -1) {
         appState.transactions.splice(existingIdx, 1);
         changed = true;
@@ -615,39 +636,74 @@ function renderCoupleHorizontalBoards(summary) {
   const container = document.getElementById('couple-horizontal-boards');
   if (!container) return;
 
+  const formatShortDayMonth = (isoDate = '') => {
+    if (!isoDate || !isoDate.includes('-')) return '--/--';
+    const parts = isoDate.split('-');
+    return `${parts[2] || '01'}/${parts[1] || '01'}`;
+  };
+
   const buildPersonBoardHtml = (personKey, title, emoji, accentBorder, salaryVal, totalSpent, balanceVal, txs) => {
-    const isHorizontalItems = appState.itemsDisplayMode === 'horizontal';
     const computedTotalSpent = txs.reduce((acc, tx) => acc + parseAmountValue(tx.displayAmount ?? tx.amount), 0);
     const finalTotalSpent = computedTotalSpent > 0 ? computedTotalSpent : parseAmountValue(totalSpent);
     const finalBalanceVal = parseAmountValue(salaryVal) - finalTotalSpent;
+
+    const personState = appState.personBoardState?.[personKey] || { sectorFilter: 'all', collapsedSectors: {} };
+    const activeSectorFilter = personState.sectorFilter || 'all';
+    const collapsedSectors = personState.collapsedSectors || {};
+
+    // Agrupa as despesas por Setor/Categoria
+    const sectorGroups = SECTORS.map(sec => {
+      const items = txs.filter(tx => (tx.sector || 'mercado') === sec.id);
+      const subtotal = items.reduce((acc, tx) => acc + parseAmountValue(tx.displayAmount ?? tx.amount), 0);
+      return {
+        sector: sec,
+        items,
+        subtotal
+      };
+    }).filter(g => g.items.length > 0);
+
+    // Se o filtro ativo for de uma categoria que ficou vazia, volta para 'all'
+    const effectiveFilter =
+      activeSectorFilter !== 'all' && !sectorGroups.some(g => g.sector.id === activeSectorFilter)
+        ? 'all'
+        : activeSectorFilter;
+
+    const visibleGroups =
+      effectiveFilter === 'all'
+        ? sectorGroups
+        : sectorGroups.filter(g => g.sector.id === effectiveFilter);
 
     return `
       <div class="card-surface flex-1 min-w-[340px] flex flex-col justify-between overflow-hidden">
         <div>
           <!-- Cabeçalho do Bloco Individual -->
-          <div class="p-5 border-b border-slate-200/70 dark:border-white/[0.06] flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-xl">
+          <div class="px-4 py-3.5 border-b border-slate-200/70 dark:border-white/[0.06] flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-lg shrink-0">
                 ${emoji}
               </div>
               <div>
-                <h3 class="font-extrabold text-base tracking-tight uppercase">${title}</h3>
+                <h3 class="font-extrabold text-sm sm:text-base tracking-tight uppercase">${title}</h3>
                 <div class="text-xs text-slate-400">
                   Salário no mês: <strong class="text-emerald-500">${formatCurrency(salaryVal)}</strong>
                 </div>
               </div>
             </div>
 
-            <div class="flex items-center gap-2 no-print">
+            <div class="flex items-center gap-1.5 no-print">
               <button onclick="openQuickManualModal('mercado', '${personKey}')"
-                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-600/15 hover:bg-purple-600/25 text-purple-600 dark:text-purple-300 transition flex items-center gap-1">
+                class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-purple-600/15 hover:bg-purple-600/25 text-purple-600 dark:text-purple-300 transition flex items-center gap-1">
                 <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                 <span>+ Despesa</span>
+              </button>
+              <button onclick="clearPersonMonthExpenses('${personKey}')"
+                title="Apagar todas as despesas de ${title} neste mês"
+                class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-500 dark:text-red-400 border border-red-500/25 transition flex items-center gap-1">
+                <span>🗑️ Limpar Tudo</span>
               </button>
             </div>
           </div>
 
-          <!-- Lista de Despesas Distribuída na Horizontal (Cards Lado a Lado) ou Tabela Compacta -->
           ${txs.length === 0 ? `
             <div class="p-8 text-center text-xs sm:text-sm text-slate-400">
               Nenhuma despesa registrada em <strong>${title}</strong> para ${formatMonthLabel(appState.currentMonth)}.
@@ -660,75 +716,105 @@ function renderCoupleHorizontalBoards(summary) {
                 </button>
               </div>
             </div>
-          ` : isHorizontalItems ? `
-            <div class="horizontal-items-grid">
-              ${txs.map(tx => {
-                const sec = getSectorMeta(tx.sector);
-                const labelMerchant = tx.displayMerchant || tx.merchant;
-                const shownAmount = tx.displayAmount ?? tx.amount;
+          ` : `
+            <!-- Filtro Rápido (Pills) por Categoria no Topo do Card -->
+            <div class="px-3.5 py-2 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-200/60 dark:border-white/[0.05] flex items-center gap-1.5 overflow-x-auto no-print">
+              <button onclick="setPersonSectorFilter('${personKey}', 'all')"
+                class="px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${
+                  effectiveFilter === 'all'
+                    ? 'bg-purple-700 text-white shadow-sm'
+                    : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-300/70 dark:hover:bg-slate-700'
+                }">
+                Todas (${txs.length})
+              </button>
+              ${sectorGroups.map(g => {
+                const isSelected = effectiveFilter === g.sector.id;
                 return `
-                  <div class="horizontal-item-pill">
-                    <div class="flex items-start justify-between gap-2 mb-2">
-                      <div class="min-w-0">
-                        <div class="font-bold text-sm text-slate-900 dark:text-white truncate" title="${escapeHtml(labelMerchant)}">
-                          ${escapeHtml(labelMerchant)}
-                        </div>
-                        <span class="inline-flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
-                          ${sec.emoji} ${sec.shortName}
-                        </span>
-                      </div>
-                      <div class="flex items-center gap-0.5 shrink-0 no-print">
-                        ${tx.imageDataUrl ? `
-                          <button onclick="openReceiptLightbox('${tx.id}')" class="p-1 rounded hover:bg-purple-500/20 text-purple-400" title="Ver Print">
-                            <i data-lucide="image" class="w-3.5 h-3.5"></i>
-                          </button>
-                        ` : ''}
-                        <button onclick="editTransaction('${tx.id}')" class="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-white" title="Editar">
-                          <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                        </button>
-                        <button onclick="deleteTransaction('${tx.id}')" class="p-1 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-500" title="Excluir">
-                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800/80">
-                      <span class="text-[11px] text-slate-400">${escapeHtml(tx.paymentMethod || 'PIX')}</span>
-                      <span class="text-sm font-extrabold text-red-500">${formatCurrency(shownAmount)}</span>
-                    </div>
-                  </div>
+                  <button onclick="setPersonSectorFilter('${personKey}', '${g.sector.id}')"
+                    class="px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap transition flex items-center gap-1 ${
+                      isSelected
+                        ? 'bg-purple-700 text-white shadow-sm'
+                        : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-300/70 dark:hover:bg-slate-700'
+                    }">
+                    <span>${g.sector.emoji}</span>
+                    <span>${g.sector.shortName} (${g.items.length})</span>
+                  </button>
                 `;
               }).join('')}
             </div>
-          ` : `
-            <div class="overflow-x-auto max-h-80">
-              <table class="sector-table">
-                <thead>
-                  <tr>
-                    <th>Nome da Despesa</th>
-                    <th>Setor</th>
-                    <th class="text-right">Valor (R$)</th>
-                    <th class="text-right no-print">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${txs.map(tx => {
-                    const sec = getSectorMeta(tx.sector);
-                    const labelMerchant = tx.displayMerchant || tx.merchant;
-                    const shownAmount = tx.displayAmount ?? tx.amount;
-                    return `
-                      <tr>
-                        <td class="font-bold text-slate-900 dark:text-white">${escapeHtml(labelMerchant)}</td>
-                        <td><span class="badge-sector ${sec.badgeClass}">${sec.emoji} ${sec.shortName}</span></td>
-                        <td class="text-right font-extrabold text-red-500 whitespace-nowrap">${formatCurrency(shownAmount)}</td>
-                        <td class="text-right whitespace-nowrap no-print">
-                          <button onclick="editTransaction('${tx.id}')" class="p-1 text-slate-400 hover:text-white"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
-                          <button onclick="deleteTransaction('${tx.id}')" class="p-1 text-slate-400 hover:text-red-500"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-                        </td>
-                      </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
+
+            <!-- Corpo com Scroll Interno Fixo (max-height: 480px) e Acordeões de Categoria -->
+            <div class="person-board-scroll-body p-2.5 space-y-2">
+              ${visibleGroups.map(group => {
+                const sec = group.sector;
+                const isCollapsed = Boolean(collapsedSectors[sec.id]);
+                const countLabel = `${group.items.length} ${group.items.length === 1 ? 'item' : 'itens'}`;
+                return `
+                  <div class="rounded-xl border border-slate-200/80 dark:border-slate-800/90 bg-slate-50/40 dark:bg-slate-900/40 overflow-hidden">
+                    <!-- Barra de Categoria Expansível (Acordeão) -->
+                    <button type="button"
+                      onclick="togglePersonCategoryAccordion('${personKey}', '${sec.id}')"
+                      class="w-full px-3 py-2 flex items-center justify-between gap-2 text-left bg-slate-100/80 dark:bg-slate-800/60 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span class="text-sm shrink-0">${sec.emoji}</span>
+                        <span class="font-bold text-xs text-slate-800 dark:text-slate-100 truncate">
+                          ${sec.name}
+                        </span>
+                        <span class="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-200/90 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300 shrink-0">
+                          ${countLabel}
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2 shrink-0">
+                        <span class="text-xs font-extrabold text-red-500">${formatCurrency(group.subtotal)}</span>
+                        <i data-lucide="${isCollapsed ? 'chevron-right' : 'chevron-down'}" class="w-3.5 h-3.5 text-slate-400"></i>
+                      </div>
+                    </button>
+
+                    <!-- Linhas Horizontais Ultra-Compactas (max 36px por linha) -->
+                    ${isCollapsed ? '' : `
+                      <div class="divide-y divide-slate-200/50 dark:divide-slate-800/60">
+                        ${group.items.map(tx => {
+                          const labelMerchant = tx.displayMerchant || tx.merchant;
+                          const shownAmount = tx.displayAmount ?? tx.amount;
+                          const shortDate = formatShortDayMonth(tx.date);
+                          const payLabel = tx.paymentMethod === 'Cartão de Crédito' ? 'Crédito' : (tx.paymentMethod || 'PIX');
+                          return `
+                            <div class="compact-expense-row px-2.5 flex items-center justify-between gap-2 text-xs hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition">
+                              <div class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                                <span class="text-[10px] font-mono text-slate-400 shrink-0 w-9">${shortDate}</span>
+                                <span class="font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap overflow-x-auto no-scrollbar flex-1" title="${escapeHtml(labelMerchant)}">
+                                  ${escapeHtml(labelMerchant)}
+                                </span>
+                              </div>
+                              <div class="flex items-center gap-2 shrink-0">
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hidden sm:inline-block">
+                                  ${escapeHtml(payLabel)}
+                                </span>
+                                <span class="font-extrabold text-red-500 whitespace-nowrap text-right min-w-[68px]">
+                                  ${formatCurrency(shownAmount)}
+                                </span>
+                                <div class="flex items-center gap-0.5 no-print">
+                                  ${tx.imageDataUrl ? `
+                                    <button onclick="openReceiptLightbox('${tx.id}')" class="p-1 rounded hover:bg-purple-500/20 text-purple-400" title="Ver Print">
+                                      <i data-lucide="image" class="w-3 h-3"></i>
+                                    </button>
+                                  ` : ''}
+                                  <button onclick="editTransaction('${tx.id}')" class="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white" title="Editar">
+                                    <i data-lucide="pencil" class="w-3 h-3"></i>
+                                  </button>
+                                  <button onclick="deleteTransaction('${tx.id}')" class="p-1 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-500" title="Excluir">
+                                    <i data-lucide="trash-2" class="w-3 h-3"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          `;
+                        }).join('')}
+                      </div>
+                    `}
+                  </div>
+                `;
+              }).join('')}
             </div>
           `}
         </div>
@@ -2178,6 +2264,10 @@ window.addSubscription = function(e) {
   };
 
   appState.subscriptions.push(newSub);
+  if (appState.dismissedRecurringByMonth?.[appState.currentMonth]) {
+    appState.dismissedRecurringByMonth[appState.currentMonth] =
+      appState.dismissedRecurringByMonth[appState.currentMonth].filter(id => id !== newSub.id);
+  }
   ensureRecurringTransactionsForMonth(appState.currentMonth);
   saveState();
   renderAll();
@@ -2191,6 +2281,10 @@ window.toggleSubscriptionActive = function(subId) {
   const sub = appState.subscriptions.find(s => s.id === subId);
   if (!sub) return;
   sub.active = !sub.active;
+  if (sub.active && appState.dismissedRecurringByMonth?.[appState.currentMonth]) {
+    appState.dismissedRecurringByMonth[appState.currentMonth] =
+      appState.dismissedRecurringByMonth[appState.currentMonth].filter(id => id !== subId);
+  }
   ensureRecurringTransactionsForMonth(appState.currentMonth);
   saveState();
   renderAll();
@@ -2209,14 +2303,124 @@ window.deleteSubscription = function(subId) {
   showToast('Gasto fixo removido.', 'info');
 };
 
-window.clearCurrentMonthData = function() {
-  appState.transactions = appState.transactions.filter(t => !t.date || !t.date.startsWith(appState.currentMonth));
-  if (appState.monthlySalaries && appState.monthlySalaries[appState.currentMonth]) {
-    delete appState.monthlySalaries[appState.currentMonth];
+window.setPersonSectorFilter = function(personKey, sectorId) {
+  if (!appState.personBoardState) {
+    appState.personBoardState = {
+      gabriel: { sectorFilter: 'all', collapsedSectors: {} },
+      mirela: { sectorFilter: 'all', collapsedSectors: {} }
+    };
+  }
+  if (!appState.personBoardState[personKey]) {
+    appState.personBoardState[personKey] = { sectorFilter: 'all', collapsedSectors: {} };
+  }
+  appState.personBoardState[personKey].sectorFilter = sectorId || 'all';
+  saveState();
+  renderAll();
+};
+
+window.togglePersonCategoryAccordion = function(personKey, sectorId) {
+  if (!appState.personBoardState) {
+    appState.personBoardState = {
+      gabriel: { sectorFilter: 'all', collapsedSectors: {} },
+      mirela: { sectorFilter: 'all', collapsedSectors: {} }
+    };
+  }
+  if (!appState.personBoardState[personKey]) {
+    appState.personBoardState[personKey] = { sectorFilter: 'all', collapsedSectors: {} };
+  }
+  if (!appState.personBoardState[personKey].collapsedSectors) {
+    appState.personBoardState[personKey].collapsedSectors = {};
+  }
+  const curr = Boolean(appState.personBoardState[personKey].collapsedSectors[sectorId]);
+  appState.personBoardState[personKey].collapsedSectors[sectorId] = !curr;
+  saveState();
+  renderAll();
+};
+
+window.clearPersonMonthExpenses = function(personKey) {
+  const targetOwner = (personKey || 'gabriel').toLowerCase();
+  const otherOwner = targetOwner === 'gabriel' ? 'mirela' : 'gabriel';
+  const labelPerson = targetOwner === 'gabriel' ? 'Gabriel' : 'Mirela';
+  const month = appState.currentMonth;
+
+  const monthTxs = getMonthTransactions(month);
+  const hasPersonTxs = monthTxs.some(tx => {
+    const o = (tx.owner || 'casal').toLowerCase();
+    return o === targetOwner || o === 'casal';
+  });
+
+  if (!hasPersonTxs) {
+    showToast(`Não há despesas de ${labelPerson} em ${formatMonthLabel(month)} para limpar.`, 'info');
+    return;
+  }
+
+  if (!appState.dismissedRecurringByMonth) appState.dismissedRecurringByMonth = {};
+  if (!Array.isArray(appState.dismissedRecurringByMonth[month])) {
+    appState.dismissedRecurringByMonth[month] = [];
+  }
+
+  const updatedTransactions = [];
+  for (const tx of appState.transactions) {
+    if (!tx.date || !tx.date.startsWith(month)) {
+      updatedTransactions.push(tx);
+      continue;
+    }
+
+    const txOwner = (tx.owner || 'casal').toLowerCase().trim();
+    if (txOwner === targetOwner) {
+      if (tx.isRecurring && tx.subscriptionId) {
+        if (!appState.dismissedRecurringByMonth[month].includes(tx.subscriptionId)) {
+          appState.dismissedRecurringByMonth[month].push(tx.subscriptionId);
+        }
+      }
+      // Remove este lançamento de targetOwner
+      continue;
+    }
+
+    if (txOwner === 'casal') {
+      if (tx.isRecurring && tx.subscriptionId) {
+        if (!appState.dismissedRecurringByMonth[month].includes(tx.subscriptionId)) {
+          appState.dismissedRecurringByMonth[month].push(tx.subscriptionId);
+        }
+      }
+      // Mantém apenas a metade (50%) da outra pessoa para esvaziar completamente a lista de targetOwner
+      const halfAmount = parseAmountValue(tx.amount) / 2;
+      updatedTransactions.push({
+        ...tx,
+        id: tx.isRecurring ? `tx_half_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` : tx.id,
+        owner: otherOwner,
+        amount: halfAmount,
+        isRecurring: false,
+        subscriptionId: null
+      });
+      continue;
+    }
+
+    updatedTransactions.push(tx);
+  }
+
+  appState.transactions = updatedTransactions;
+  if (appState.personBoardState?.[targetOwner]) {
+    appState.personBoardState[targetOwner].sectorFilter = 'all';
   }
   saveState();
   renderAll();
-  showToast(`Dados de ${formatMonthLabel(appState.currentMonth)} limpos!`, 'info');
+  showToast(`Todas as despesas de ${labelPerson} em ${formatMonthLabel(month)} foram removidas!`, 'info');
+};
+
+window.clearCurrentMonthData = function() {
+  const month = appState.currentMonth;
+  if (!appState.dismissedRecurringByMonth) appState.dismissedRecurringByMonth = {};
+  appState.dismissedRecurringByMonth[month] = (appState.subscriptions || []).map(s => s.id);
+
+  appState.transactions = appState.transactions.filter(t => !t.date || !t.date.startsWith(month));
+  if (appState.personBoardState) {
+    appState.personBoardState.gabriel = { sectorFilter: 'all', collapsedSectors: {} };
+    appState.personBoardState.mirela = { sectorFilter: 'all', collapsedSectors: {} };
+  }
+  saveState();
+  renderAll();
+  showToast(`Todos os gastos de ${formatMonthLabel(month)} foram zerados!`, 'info');
 };
 
 /* ==========================================================================

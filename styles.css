@@ -173,6 +173,34 @@ body {
   padding: 1rem 1.25rem;
 }
 
+/* ==========================================================================
+   Visualização Compacta Agrupada por Categoria (Despesas Gabriel & Mirela)
+   ========================================================================== */
+
+.person-board-scroll-body {
+  max-height: 480px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+.compact-expense-row {
+  height: 35px;
+  max-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.76rem;
+  transition: background-color 0.12s ease;
+}
+
+.compact-expense-row:hover {
+  background-color: rgba(130, 10, 209, 0.06);
+}
+
 /* Table Styling */
 .sector-table {
   width: 100%;

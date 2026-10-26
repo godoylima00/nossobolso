@@ -1753,8 +1753,8 @@ window.editSubscription = function(subId) {
   if (paymentInput) paymentInput.value = sub.paymentMethod || 'PIX';
 
   if (submitBtn) {
-    submitBtn.textContent = '💾 Salvar Alteração';
-    submitBtn.className = 'px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shrink-0 transition';
+    submitBtn.textContent = '💾 Salvar';
+    submitBtn.className = 'px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shrink-0 whitespace-nowrap transition';
   }
   if (cancelBtn) {
     cancelBtn.classList.remove('hidden');
@@ -1781,7 +1781,7 @@ window.cancelSubscriptionEdit = function() {
   const cancelBtn = document.getElementById('sub-cancel-btn');
   if (submitBtn) {
     submitBtn.textContent = '+ Fixar';
-    submitBtn.className = 'px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold shrink-0 transition';
+    submitBtn.className = 'px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold shrink-0 whitespace-nowrap transition';
   }
   if (cancelBtn) {
     cancelBtn.classList.add('hidden');

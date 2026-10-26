@@ -441,7 +441,7 @@
       <!-- ==================================================================
            SEÇÃO DE ASSINATURAS E GASTOS FIXOS RECORRENTES
            ================================================================== -->
-      <section id="section-subscriptions" class="card-surface p-5 sm:p-6 mb-10">
+      <section id="section-subscriptions" class="card-surface p-5 sm:p-6 mb-10 overflow-hidden">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
           <div>
             <div class="flex items-center gap-2">
@@ -457,25 +457,25 @@
           </div>
         </div>
 
-        <form id="subscription-form" onsubmit="addSubscription(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5 my-4 no-print">
+        <form id="subscription-form" onsubmit="addSubscription(event)" class="flex flex-wrap items-center gap-2.5 my-4 w-full box-border no-print">
           <input id="sub-merchant" type="text" required placeholder="Nome da despesa fixa..."
-            class="lg:col-span-2 px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            class="flex-1 min-w-[180px] px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
 
           <select id="sub-owner"
-            class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            class="w-full sm:w-auto min-w-[115px] px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
             <option value="gabriel">👦 Gabriel</option>
             <option value="mirela">👩 Mirela</option>
             <option value="casal">💑 Casal</option>
           </select>
 
           <input id="sub-amount" type="number" step="0.01" min="0.01" required placeholder="Valor (R$)"
-            class="px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            class="flex-1 sm:flex-initial sm:w-32 min-w-[110px] px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
 
-          <input id="sub-day" type="number" min="1" max="28" required placeholder="Dia (1-28)" value="5"
-            class="px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          <input id="sub-day" type="number" min="1" max="28" required placeholder="Dia" value="5" title="Dia do vencimento (1 a 28)"
+            class="w-[75px] max-w-[80px] px-2.5 py-2 rounded-xl text-xs text-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
 
           <select id="sub-sector"
-            class="px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            class="w-full sm:w-auto min-w-[150px] px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
             <option value="mercado">🏠 Casa & Mercado</option>
             <option value="compras">💳 Cartões & Compras</option>
             <option value="delivery">🍔 Delivery</option>
@@ -483,19 +483,20 @@
             <option value="saude">💊 Saúde</option>
           </select>
 
-          <div class="flex gap-1.5 sm:col-span-2 lg:col-span-1">
-            <select id="sub-payment"
-              class="flex-1 min-w-[90px] px-2 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
-              <option value="PIX">⚡ PIX</option>
-              <option value="Cartão de Crédito">💳 Crédito</option>
-              <option value="Cartão de Débito">🏦 Débito</option>
-            </select>
+          <select id="sub-payment"
+            class="w-full sm:w-auto min-w-[110px] px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <option value="PIX">⚡ PIX</option>
+            <option value="Cartão de Crédito">💳 Crédito</option>
+            <option value="Cartão de Débito">🏦 Débito</option>
+          </select>
+
+          <div class="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
             <button id="sub-submit-btn" type="submit"
-              class="px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold shrink-0 transition">
+              class="px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold shrink-0 whitespace-nowrap transition">
               + Fixar
             </button>
             <button id="sub-cancel-btn" type="button" onclick="cancelSubscriptionEdit()"
-              class="hidden px-2.5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shrink-0 transition">
+              class="hidden px-3 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold shrink-0 whitespace-nowrap transition">
               Cancelar
             </button>
           </div>

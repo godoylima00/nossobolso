@@ -50,8 +50,13 @@
   }
 
   function buildSupabaseConfig() {
+    let rawUrl = (getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL') || '').trim();
+    // Remove automaticamente "/rest/v1/" e barras finais caso o usuário tenha copiado a URL completa da Data API
+    if (rawUrl) {
+      rawUrl = rawUrl.replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+    }
     return {
-      url: getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL'),
+      url: rawUrl,
       anonKey: getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY')
     };
   }

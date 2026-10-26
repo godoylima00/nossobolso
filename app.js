@@ -94,6 +94,7 @@ let appState = {
 
 let donutChartInstance = null;
 let barChartInstance = null;
+let editingSubscriptionId = null;
 
 let pendingReceiptData = {
   editingId: null,
@@ -294,15 +295,18 @@ function ensureRecurringTransactionsForMonth(yyyyMM) {
       changed = true;
     } else {
       const curr = appState.transactions[existingIdx];
+      const expectedDate = `${yyyyMM}-${dayStr}`;
       if (
         curr.merchant !== cleanMerchant ||
         curr.owner !== normOwner ||
         parseAmountValue(curr.amount) !== numAmount ||
         curr.sector !== (sub.sector || 'mercado') ||
-        curr.paymentMethod !== (sub.paymentMethod || 'PIX')
+        curr.paymentMethod !== (sub.paymentMethod || 'PIX') ||
+        curr.date !== expectedDate
       ) {
         appState.transactions[existingIdx] = {
           ...curr,
+          date: expectedDate,
           merchant: cleanMerchant,
           owner: normOwner,
           sector: sub.sector || 'mercado',
@@ -1230,8 +1234,9 @@ function renderSubscriptionsSection() {
     const ownerBadgeLabel = ownerMeta.id === 'casal'
       ? `${ownerMeta.emoji} Casal • ${formatCurrency(fullAmt / 2)} cada`
       : `${ownerMeta.emoji} ${ownerMeta.label}`;
+    const isEditing = editingSubscriptionId === sub.id;
     return `
-      <tr>
+      <tr class="${isEditing ? 'bg-purple-500/10' : ''}">
         <td class="font-semibold">Dia ${String(sub.day).padStart(2, '0')}</td>
         <td>
           <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ownerMeta.badge}">${ownerBadgeLabel}</span>
@@ -1240,8 +1245,8 @@ function renderSubscriptionsSection() {
         <td><span class="badge-sector ${sec.badgeClass}">${sec.emoji} ${sec.shortName}</span></td>
         <td>${escapeHtml(sub.paymentMethod)}</td>
         <td class="text-right font-bold">${formatCurrency(fullAmt)}</td>
-        <td class="text-right">
-          <div class="inline-flex items-center gap-2">
+        <td class="text-right no-print">
+          <div class="inline-flex items-center gap-1.5">
             <button onclick="toggleSubscriptionActive('${sub.id}')"
               class="px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
                 sub.active
@@ -1250,7 +1255,14 @@ function renderSubscriptionsSection() {
               }">
               ${sub.active ? 'Ativo' : 'Pausado'}
             </button>
+            <button onclick="editSubscription('${sub.id}')"
+              title="Editar Gasto Fixo"
+              class="px-2 py-1 rounded-lg text-xs font-semibold bg-purple-500/15 hover:bg-purple-500/25 text-purple-500 transition inline-flex items-center gap-1">
+              <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+              <span>Editar</span>
+            </button>
             <button onclick="deleteSubscription('${sub.id}')"
+              title="Excluir Gasto Fixo"
               class="p-1.5 rounded-lg hover:bg-red-500/15 text-slate-400 hover:text-red-500 transition">
               <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
@@ -1718,18 +1730,125 @@ window.saveSectorBudget = function(e) {
   }
 };
 
+window.editSubscription = function(subId) {
+  const sub = appState.subscriptions.find(s => s.id === subId);
+  if (!sub) return;
+
+  editingSubscriptionId = sub.id;
+
+  const merchantInput = document.getElementById('sub-merchant');
+  const ownerInput = document.getElementById('sub-owner');
+  const amountInput = document.getElementById('sub-amount');
+  const dayInput = document.getElementById('sub-day');
+  const sectorInput = document.getElementById('sub-sector');
+  const paymentInput = document.getElementById('sub-payment');
+  const submitBtn = document.getElementById('sub-submit-btn');
+  const cancelBtn = document.getElementById('sub-cancel-btn');
+
+  if (merchantInput) merchantInput.value = String(sub.merchant || '').replace(/\s*\(50%\s*Casal\)\s*$/i, '').trim();
+  if (ownerInput) ownerInput.value = (sub.owner || 'casal').toLowerCase().trim();
+  if (amountInput) amountInput.value = parseAmountValue(sub.amount).toFixed(2);
+  if (dayInput) dayInput.value = Math.min(28, Math.max(1, Number(sub.day) || 5));
+  if (sectorInput) sectorInput.value = sub.sector || 'mercado';
+  if (paymentInput) paymentInput.value = sub.paymentMethod || 'PIX';
+
+  if (submitBtn) {
+    submitBtn.textContent = '💾 Salvar Alteração';
+    submitBtn.className = 'px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shrink-0 transition';
+  }
+  if (cancelBtn) {
+    cancelBtn.classList.remove('hidden');
+  }
+
+  renderSubscriptionsSection();
+  if (window.lucide) window.lucide.createIcons();
+
+  if (merchantInput) {
+    merchantInput.focus();
+    merchantInput.select();
+  }
+};
+
+window.cancelSubscriptionEdit = function() {
+  editingSubscriptionId = null;
+  const form = document.getElementById('subscription-form');
+  if (form) form.reset();
+
+  const dayInput = document.getElementById('sub-day');
+  if (dayInput) dayInput.value = 5;
+
+  const submitBtn = document.getElementById('sub-submit-btn');
+  const cancelBtn = document.getElementById('sub-cancel-btn');
+  if (submitBtn) {
+    submitBtn.textContent = '+ Fixar';
+    submitBtn.className = 'px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold shrink-0 transition';
+  }
+  if (cancelBtn) {
+    cancelBtn.classList.add('hidden');
+  }
+
+  renderSubscriptionsSection();
+  if (window.lucide) window.lucide.createIcons();
+};
+
 window.addSubscription = function(e) {
   if (e) e.preventDefault();
-  const merchant = document.getElementById('sub-merchant').value.trim();
-  const amount = parseFloat(document.getElementById('sub-amount').value);
-  const day = parseInt(document.getElementById('sub-day').value, 10) || 5;
-  const owner = document.getElementById('sub-owner')?.value || 'gabriel';
-  const sector = document.getElementById('sub-sector').value;
-  const paymentMethod = document.getElementById('sub-payment').value;
+  const rawMerchant = document.getElementById('sub-merchant').value.trim();
+  const merchant = rawMerchant.replace(/\s*\(50%\s*Casal\)\s*$/i, '').trim();
+  const amount = parseAmountValue(document.getElementById('sub-amount').value);
+  const day = Math.min(28, Math.max(1, parseInt(document.getElementById('sub-day').value, 10) || 5));
+  const owner = (document.getElementById('sub-owner')?.value || 'gabriel').toLowerCase().trim();
+  const sector = document.getElementById('sub-sector').value || 'mercado';
+  const paymentMethod = document.getElementById('sub-payment').value || 'PIX';
 
   if (!merchant || isNaN(amount) || amount <= 0) {
     showToast('Preencha a descrição e o valor do gasto recorrente.', 'danger');
     return;
+  }
+
+  if (editingSubscriptionId) {
+    const idx = appState.subscriptions.findIndex(s => s.id === editingSubscriptionId);
+    if (idx !== -1) {
+      const oldSub = appState.subscriptions[idx];
+      appState.subscriptions[idx] = {
+        ...oldSub,
+        merchant,
+        owner,
+        amount,
+        day,
+        sector,
+        paymentMethod
+      };
+
+      // Atualiza também quaisquer lançamentos recorrentes vinculados a esta assinatura (sem duplicar)
+      const dayStr = String(day).padStart(2, '0');
+      appState.transactions = appState.transactions.map(tx => {
+        if (tx.subscriptionId === editingSubscriptionId || tx.id.startsWith(`rec_${editingSubscriptionId}_`)) {
+          const txMonth = (tx.date || appState.currentMonth).slice(0, 7);
+          return {
+            ...tx,
+            date: `${txMonth}-${dayStr}`,
+            merchant,
+            owner,
+            amount,
+            sector,
+            paymentMethod,
+            isRecurring: true,
+            subscriptionId: editingSubscriptionId
+          };
+        }
+        return tx;
+      });
+
+      const updatedName = merchant;
+      cancelSubscriptionEdit();
+      ensureRecurringTransactionsForMonth(appState.currentMonth);
+      saveState();
+      renderAll();
+      showToast(`Gasto fixo "${updatedName}" atualizado com sucesso!`);
+      return;
+    }
+    editingSubscriptionId = null;
   }
 
   const newSub = {
@@ -1737,7 +1856,7 @@ window.addSubscription = function(e) {
     merchant,
     owner,
     amount,
-    day: Math.min(28, Math.max(1, day)),
+    day,
     sector,
     paymentMethod,
     active: true
@@ -1748,6 +1867,8 @@ window.addSubscription = function(e) {
   saveState();
   renderAll();
   e.target.reset();
+  const dayInput = document.getElementById('sub-day');
+  if (dayInput) dayInput.value = 5;
   showToast(`Gasto fixo "${merchant}" cadastrado!`);
 };
 
@@ -1755,14 +1876,19 @@ window.toggleSubscriptionActive = function(subId) {
   const sub = appState.subscriptions.find(s => s.id === subId);
   if (!sub) return;
   sub.active = !sub.active;
+  ensureRecurringTransactionsForMonth(appState.currentMonth);
   saveState();
   renderAll();
 };
 
 window.deleteSubscription = function(subId) {
+  if (editingSubscriptionId === subId) {
+    cancelSubscriptionEdit();
+  }
   appState.subscriptions = appState.subscriptions.filter(s => s.id !== subId);
-  const recTxId = `rec_${subId}_${appState.currentMonth}`;
-  appState.transactions = appState.transactions.filter(t => t.id !== recTxId);
+  appState.transactions = appState.transactions.filter(
+    t => t.subscriptionId !== subId && !t.id.startsWith(`rec_${subId}_`)
+  );
   saveState();
   renderAll();
   showToast('Gasto fixo removido.', 'info');

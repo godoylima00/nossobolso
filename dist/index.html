@@ -740,93 +740,92 @@
             </button>
           </div>
 
-          <div class="space-y-3 w-full box-border">
+          <div class="grid grid-cols-2 gap-x-4 gap-y-3 w-full box-border">
             <!-- Responsável pela Despesa -->
-            <div class="min-w-0 w-full">
+            <div class="col-span-2 min-w-0 w-full overflow-hidden">
               <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
                 De quem é esta despesa? *
               </label>
               <select id="confirm-owner" onchange="validateDuplicateOnConfirmForm()"
-                class="w-full max-w-full min-w-0 box-border p-2.5 rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                class="block w-full max-w-full min-w-0 box-border m-0 px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-inset focus:ring-purple-500">
                 <option value="gabriel">👦 Despesas Gabriel</option>
                 <option value="mirela">👩 Despesas Mirela</option>
                 <option value="casal">💑 Ambos / Casal</option>
               </select>
             </div>
 
-            <!-- Linha Dupla: Valor Total + Parcelas -->
-            <div class="grid grid-cols-2 gap-4 w-full box-border">
-              <div class="min-w-0 w-full overflow-hidden">
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
-                  1. Valor Total (R$) *
-                </label>
-                <input id="confirm-amount" type="number" step="0.01" min="0.01" required
-                  oninput="validateDuplicateOnConfirmForm(); updateInstallmentPreview()"
-                  placeholder="Ex: 1200.00"
-                  class="block w-full max-w-full min-w-0 box-border px-3 py-2.5 h-[42px] rounded-xl text-sm font-bold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
-              </div>
-
-              <div class="min-w-0 w-full overflow-hidden">
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
-                  Parcelas (1x a 12x)
-                </label>
-                <select id="confirm-installments" onchange="updateInstallmentPreview()"
-                  class="block w-full max-w-full min-w-0 box-border px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                  <option value="1" selected>1x (À vista)</option>
-                  <option value="2">2x sem juros</option>
-                  <option value="3">3x sem juros</option>
-                  <option value="4">4x sem juros</option>
-                  <option value="5">5x sem juros</option>
-                  <option value="6">6x sem juros</option>
-                  <option value="7">7x sem juros</option>
-                  <option value="8">8x sem juros</option>
-                  <option value="9">9x sem juros</option>
-                  <option value="10">10x sem juros</option>
-                  <option value="11">11x sem juros</option>
-                  <option value="12">12x sem juros</option>
-                </select>
-              </div>
+            <!-- 1. Valor Total -->
+            <div class="col-span-1 min-w-0 w-full overflow-hidden">
+              <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
+                1. Valor Total (R$) *
+              </label>
+              <input id="confirm-amount" type="number" step="0.01" min="0.01" required
+                oninput="validateDuplicateOnConfirmForm(); updateInstallmentPreview()"
+                placeholder="Ex: 1200.00"
+                class="block w-full max-w-full min-w-0 box-border m-0 px-3 py-2.5 h-[42px] rounded-xl text-sm font-bold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-inset focus:ring-purple-500" />
             </div>
-            <p id="confirm-installments-preview" class="hidden text-[11px] font-bold text-purple-400 -mt-1 break-words"></p>
 
-            <!-- Nome do Estabelecimento / Despesa -->
-            <div class="min-w-0 w-full">
+            <!-- Parcelas (1x a 12x) -->
+            <div class="col-span-1 min-w-0 w-full overflow-hidden">
+              <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
+                Parcelas (1x a 12x)
+              </label>
+              <select id="confirm-installments" onchange="updateInstallmentPreview()"
+                class="block w-full max-w-full min-w-0 box-border m-0 px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-inset focus:ring-purple-500">
+                <option value="1" selected>1x (À vista)</option>
+                <option value="2">2x sem juros</option>
+                <option value="3">3x sem juros</option>
+                <option value="4">4x sem juros</option>
+                <option value="5">5x sem juros</option>
+                <option value="6">6x sem juros</option>
+                <option value="7">7x sem juros</option>
+                <option value="8">8x sem juros</option>
+                <option value="9">9x sem juros</option>
+                <option value="10">10x sem juros</option>
+                <option value="11">11x sem juros</option>
+                <option value="12">12x sem juros</option>
+              </select>
+            </div>
+
+            <p id="confirm-installments-preview" class="hidden col-span-2 text-[11px] font-bold text-purple-400 -mt-1 break-words"></p>
+
+            <!-- 2. Nome do Estabelecimento / Despesa (Alinhado 100% na mesma grelha) -->
+            <div class="col-span-2 min-w-0 w-full overflow-hidden">
               <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
                 2. Nome da Despesa / Estabelecimento *
               </label>
               <input id="confirm-merchant" type="text" required
                 oninput="autoClassifyConfirmMerchant(this.value)"
                 placeholder="Ex: Geladeira, Apartamento, Nubank, iFood..."
-                class="block w-full max-w-full min-w-0 box-border px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                class="block w-full max-w-full min-w-0 box-border m-0 px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-inset focus:ring-purple-500" />
             </div>
 
-            <!-- Linha Dupla: Data + Hora (Inputs Nativos Separados com Gap) -->
-            <div class="grid grid-cols-2 gap-4 w-full box-border">
-              <div class="min-w-0 w-full overflow-hidden">
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
-                  3. Data *
-                </label>
-                <input id="confirm-date" type="date" required
-                  onchange="validateDuplicateOnConfirmForm()"
-                  class="block w-full max-w-full min-w-0 box-border px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none" />
-              </div>
-
-              <div class="min-w-0 w-full overflow-hidden">
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
-                  Hora
-                </label>
-                <input id="confirm-time" type="time"
-                  class="block w-full max-w-full min-w-0 box-border px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none" />
-              </div>
+            <!-- 3. Data (Input Nativo) -->
+            <div class="col-span-1 min-w-0 w-full overflow-hidden">
+              <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
+                3. Data *
+              </label>
+              <input id="confirm-date" type="date" required
+                onchange="validateDuplicateOnConfirmForm()"
+                class="block w-full max-w-full min-w-0 box-border m-0 px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-inset focus:ring-purple-500 appearance-none" />
             </div>
 
-            <!-- Categoria Sugerida -->
-            <div class="min-w-0 w-full">
+            <!-- Hora (Input Nativo) -->
+            <div class="col-span-1 min-w-0 w-full overflow-hidden">
+              <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
+                Hora
+              </label>
+              <input id="confirm-time" type="time"
+                class="block w-full max-w-full min-w-0 box-border m-0 px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-inset focus:ring-purple-500 appearance-none" />
+            </div>
+
+            <!-- 4. Categoria / Setor -->
+            <div class="col-span-2 min-w-0 w-full overflow-hidden">
               <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
                 4. Categoria / Setor *
               </label>
               <select id="confirm-sector"
-                class="block w-full max-w-full min-w-0 box-border px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                class="block w-full max-w-full min-w-0 box-border m-0 px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-inset focus:ring-purple-500">
                 <option value="mercado">🏠 Mercado, Casa & Contas</option>
                 <option value="compras">💳 Cartões, Bancos & Compras</option>
                 <option value="delivery">🍔 Delivery & Alimentação</option>
@@ -835,13 +834,13 @@
               </select>
             </div>
 
-            <!-- Forma de Pagamento -->
-            <div class="min-w-0 w-full">
+            <!-- 5. Forma de Pagamento -->
+            <div class="col-span-2 min-w-0 w-full overflow-hidden">
               <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1 text-left">
                 5. Forma de Pagamento *
               </label>
               <select id="confirm-payment"
-                class="block w-full max-w-full min-w-0 box-border px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                class="block w-full max-w-full min-w-0 box-border m-0 px-3 py-2.5 h-[42px] rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-inset focus:ring-purple-500">
                 <option value="PIX">⚡ PIX</option>
                 <option value="Cartão de Crédito">💳 Cartão de Crédito</option>
                 <option value="Cartão de Débito">🏦 Cartão de Débito</option>

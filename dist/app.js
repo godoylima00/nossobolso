@@ -2766,6 +2766,11 @@ window.clearPersonMonthExpenses = function(personKey) {
     return;
   }
 
+  const confirmedPerson = window.confirm(
+    `⚠️ TEM A CERTEZA ABSOLUTA?\n\nIsto irá apagar todas as despesas de ${labelPerson} registradas neste mês (${formatMonthLabel(month)}). Esta ação não pode ser desfeita.`
+  );
+  if (!confirmedPerson) return;
+
   if (!appState.dismissedRecurringByMonth) appState.dismissedRecurringByMonth = {};
   if (!Array.isArray(appState.dismissedRecurringByMonth[month])) {
     appState.dismissedRecurringByMonth[month] = [];
@@ -2832,6 +2837,11 @@ window.clearPersonMonthExpenses = function(personKey) {
 };
 
 window.clearCurrentMonthData = function() {
+  const confirmed = window.confirm(
+    "⚠️ TEM A CERTEZA ABSOLUTA?\n\nIsto irá apagar TODOS os gastos registrados neste mês para ambos. Esta ação não pode ser desfeita."
+  );
+  if (!confirmed) return;
+
   const month = appState.currentMonth;
   if (!appState.dismissedRecurringByMonth) appState.dismissedRecurringByMonth = {};
   appState.dismissedRecurringByMonth[month] = (appState.subscriptions || []).map(s => s.id);

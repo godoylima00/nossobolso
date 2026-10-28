@@ -2749,9 +2749,59 @@ window.togglePersonCategoryAccordion = function(personKey, sectorId) {
   renderAll();
 };
 
+let isDeleteAllModalOpen = false;
+let pendingDeleteModalTarget = 'all';
+
+window.openDeleteAllModal = function(target = 'all') {
+  isDeleteAllModalOpen = true;
+  pendingDeleteModalTarget = target;
+
+  const modalEl = document.getElementById('delete-all-confirm-modal');
+  const titleEl = document.getElementById('delete-all-modal-title');
+  const descEl = document.getElementById('delete-all-modal-desc');
+
+  if (titleEl) {
+    titleEl.textContent = 'Tem certeza absoluta?';
+  }
+  if (descEl) {
+    if (target === 'gabriel' || target === 'mirela') {
+      const labelPerson = target === 'gabriel' ? 'Gabriel' : 'Mirela';
+      descEl.textContent = `Isso apagará TODOS os gastos de ${labelPerson} registrados neste mês. Esta ação não pode ser desfeita.`;
+    } else {
+      descEl.textContent = 'Isso apagará TODOS os gastos registrados neste mês para ambos. Esta ação não pode ser desfeita.';
+    }
+  }
+
+  if (modalEl) {
+    modalEl.classList.remove('hidden');
+  }
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+};
+
+window.closeDeleteAllModal = function() {
+  isDeleteAllModalOpen = false;
+  const modalEl = document.getElementById('delete-all-confirm-modal');
+  if (modalEl) {
+    modalEl.classList.add('hidden');
+  }
+};
+
+window.confirmExecuteDeleteAll = function() {
+  if (!isDeleteAllModalOpen) return;
+  const target = pendingDeleteModalTarget;
+  closeDeleteAllModal();
+
+  if (target === 'gabriel' || target === 'mirela') {
+    executeClearPersonMonthExpenses(target);
+  } else {
+    executeClearCurrentMonthData();
+  }
+};
+
 window.clearPersonMonthExpenses = function(personKey) {
   const targetOwner = (personKey || 'gabriel').toLowerCase();
-  const otherOwner = targetOwner === 'gabriel' ? 'mirela' : 'gabriel';
   const labelPerson = targetOwner === 'gabriel' ? 'Gabriel' : 'Mirela';
   const month = appState.currentMonth;
 
@@ -2766,10 +2816,14 @@ window.clearPersonMonthExpenses = function(personKey) {
     return;
   }
 
-  const confirmedPerson = window.confirm(
-    `⚠️ TEM A CERTEZA ABSOLUTA?\n\nIsto irá apagar todas as despesas de ${labelPerson} registradas neste mês (${formatMonthLabel(month)}). Esta ação não pode ser desfeita.`
-  );
-  if (!confirmedPerson) return;
+  openDeleteAllModal(targetOwner);
+};
+
+function executeClearPersonMonthExpenses(personKey) {
+  const targetOwner = (personKey || 'gabriel').toLowerCase();
+  const otherOwner = targetOwner === 'gabriel' ? 'mirela' : 'gabriel';
+  const labelPerson = targetOwner === 'gabriel' ? 'Gabriel' : 'Mirela';
+  const month = appState.currentMonth;
 
   if (!appState.dismissedRecurringByMonth) appState.dismissedRecurringByMonth = {};
   if (!Array.isArray(appState.dismissedRecurringByMonth[month])) {
@@ -2834,14 +2888,13 @@ window.clearPersonMonthExpenses = function(personKey) {
   }
   renderAll();
   showToast(`Todas as despesas de ${labelPerson} em ${formatMonthLabel(month)} foram removidas!`, 'info');
-};
+}
 
 window.clearCurrentMonthData = function() {
-  const confirmed = window.confirm(
-    "⚠️ TEM A CERTEZA ABSOLUTA?\n\nIsto irá apagar TODOS os gastos registrados neste mês para ambos. Esta ação não pode ser desfeita."
-  );
-  if (!confirmed) return;
+  openDeleteAllModal('all');
+};
 
+function executeClearCurrentMonthData() {
   const month = appState.currentMonth;
   if (!appState.dismissedRecurringByMonth) appState.dismissedRecurringByMonth = {};
   appState.dismissedRecurringByMonth[month] = (appState.subscriptions || []).map(s => s.id);
@@ -2862,7 +2915,7 @@ window.clearCurrentMonthData = function() {
   }
   renderAll();
   showToast(`Todos os gastos de ${formatMonthLabel(month)} foram zerados!`, 'info');
-};
+}
 
 /* ==========================================================================
    Exportação para Excel (CSV), Relatório PDF e Backup JSON

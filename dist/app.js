@@ -1007,7 +1007,7 @@ function renderSectorFilterTabs(summary) {
           ? 'bg-purple-700 text-white shadow-md'
           : 'bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300/70 dark:hover:bg-slate-700'
       }">
-      <span>📊 Todos Setores Lado a Lado</span>
+      <span>📊 Todos os Setores</span>
       <span class="px-2 py-0.5 rounded-full text-[11px] ${allActive ? 'bg-white/20 text-white' : 'bg-slate-300 dark:bg-slate-700'}">${summary.txCount}</span>
     </button>
   `;
@@ -1039,7 +1039,9 @@ function renderSectorTables(summary) {
     ? SECTORS
     : SECTORS.filter(s => s.id === appState.activeSectorFilter);
 
-  const isHorizontalItems = appState.itemsDisplayMode === 'horizontal';
+  wrapper.className = appState.activeSectorFilter === 'all'
+    ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6'
+    : 'grid grid-cols-1 max-w-3xl gap-6';
 
   wrapper.innerHTML = visibleSectors.map(sector => {
     const secData = summary.bySector[sector.id];
@@ -1082,7 +1084,7 @@ function renderSectorTables(summary) {
     const filteredSubtotal = rows.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
 
     return `
-      <div class="card-surface horizontal-sector-card overflow-hidden justify-between" id="sector-card-${sector.id}">
+      <div class="card-surface flex flex-col justify-between overflow-hidden w-full" id="sector-card-${sector.id}">
         <div>
           <!-- Cabeçalho Compacto do Setor + Barra de Meta -->
           <div class="p-4 border-b border-slate-200 dark:border-slate-800">
@@ -1128,105 +1130,84 @@ function renderSectorTables(summary) {
               value="${filterState.search.replace(/"/g, '&quot;')}"
               oninput="updateSectorSearch('${sector.id}', this.value)"
               placeholder="Filtrar em ${sector.shortName}..."
-              class="flex-1 px-2.5 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-purple-500" />
+              class="flex-1 min-w-0 px-2.5 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-purple-500" />
             <select onchange="updateSectorSort('${sector.id}', this.value)"
-              class="px-2 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              class="px-2 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shrink-0">
               <option value="recent" ${filterState.sort === 'recent' ? 'selected' : ''}>Recentes</option>
               <option value="highest" ${filterState.sort === 'highest' ? 'selected' : ''}>Maior R$</option>
               <option value="lowest" ${filterState.sort === 'lowest' ? 'selected' : ''}>Menor R$</option>
               <option value="az" ${filterState.sort === 'az' ? 'selected' : ''}>A-Z</option>
             </select>
             <button onclick="openQuickManualModal('${sector.id}')"
-              class="px-2.5 py-1 text-xs font-bold rounded-lg bg-purple-600/15 text-purple-500 hover:bg-purple-600/25 transition">
+              title="Adicionar despesa em ${sector.shortName}"
+              class="px-2.5 py-1 text-xs font-bold rounded-lg bg-purple-600/15 text-purple-500 hover:bg-purple-600/25 transition shrink-0">
               +
             </button>
           </div>
 
-          <!-- Itens do Setor (Distribuídos na Horizontal ou Tabela) -->
+          <!-- Lista Vertical Compacta com Scroll Vertical Interno Limitado -->
           ${rows.length === 0 ? `
             <div class="p-6 text-center text-xs text-slate-400">
               Sem gastos em <strong>${sector.shortName}</strong> neste mês.
             </div>
-          ` : isHorizontalItems ? `
-            <div class="horizontal-items-strip">
+          ` : `
+            <div class="max-h-[300px] overflow-y-auto divide-y divide-slate-200/60 dark:divide-slate-800/70">
               ${rows.map(tx => {
                 const ownerMeta = getOwnerMeta(tx.owner);
                 const fullAmt = parseAmountValue(tx.amount);
+                const shortDate = formatShortDayMonth(tx.date);
+                const payLabel = tx.paymentMethod === 'Cartão de Crédito'
+                  ? 'Crédito'
+                  : tx.paymentMethod === 'Cartão de Débito'
+                  ? 'Débito'
+                  : (tx.paymentMethod || 'PIX');
                 const ownerBadgeLabel = ownerMeta.id === 'casal'
-                  ? `${ownerMeta.emoji} Casal • ${formatCurrency(fullAmt / 2)} cada`
+                  ? `${ownerMeta.emoji} Casal`
                   : `${ownerMeta.emoji} ${ownerMeta.label}`;
+                const ownerTooltip = ownerMeta.id === 'casal'
+                  ? `Casal • ${formatCurrency(fullAmt / 2)} cada`
+                  : ownerMeta.label;
                 return `
-                  <div class="horizontal-item-pill">
-                    <div>
-                      <div class="flex items-center justify-between gap-1 mb-1">
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ownerMeta.badge}">
-                          ${ownerBadgeLabel}
-                        </span>
-                        <div class="flex items-center gap-0.5 no-print">
-                          ${tx.imageDataUrl ? `
-                            <button onclick="openReceiptLightbox('${tx.id}')" class="p-1 text-purple-400 hover:text-purple-300" title="Ver Print">
-                              <i data-lucide="image" class="w-3.5 h-3.5"></i>
-                            </button>
-                          ` : ''}
-                          <button onclick="editTransaction('${tx.id}')" class="p-1 text-slate-400 hover:text-white" title="Editar">
-                            <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                          </button>
-                          <button onclick="deleteTransaction('${tx.id}')" class="p-1 text-slate-400 hover:text-red-500" title="Excluir">
-                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                          </button>
-                        </div>
-                      </div>
-                      <div class="font-bold text-sm text-slate-900 dark:text-white truncate" title="${escapeHtml(tx.merchant)}">
+                  <div class="px-3.5 py-2.5 flex items-center justify-between gap-2 text-xs hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition">
+                    <div class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${ownerMeta.badge}" title="${ownerTooltip}">
+                        ${ownerBadgeLabel}
+                      </span>
+                      <span class="font-semibold text-slate-900 dark:text-slate-100 truncate flex-1" title="${escapeHtml(tx.merchant)}">
                         ${escapeHtml(tx.merchant)}
-                      </div>
+                      </span>
                     </div>
-                    <div class="flex items-center justify-between mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-800">
-                      <span class="text-[11px] text-slate-400">${formatDateBR(tx.date).slice(0, 5)} • ${escapeHtml(tx.paymentMethod || 'PIX')}</span>
-                      <span class="text-sm font-extrabold text-red-500">${formatCurrency(fullAmt)}</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <span class="text-[10px] text-slate-400 whitespace-nowrap">
+                        ${shortDate} • ${escapeHtml(payLabel)}
+                      </span>
+                      <span class="font-extrabold text-red-500 whitespace-nowrap text-right min-w-[68px]">
+                        ${formatCurrency(fullAmt)}
+                      </span>
+                      <div class="flex items-center gap-0.5 no-print">
+                        ${tx.imageDataUrl ? `
+                          <button onclick="openReceiptLightbox('${tx.id}')" class="p-1 rounded hover:bg-purple-500/20 text-purple-400 transition" title="Ver Print">
+                            <i data-lucide="image" class="w-3.5 h-3.5"></i>
+                          </button>
+                        ` : ''}
+                        <button onclick="editTransaction('${tx.id}')" class="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition" title="Editar">
+                          <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="deleteTransaction('${tx.id}')" class="p-1 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-500 transition" title="Excluir">
+                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 `;
               }).join('')}
-            </div>
-          ` : `
-            <div class="overflow-x-auto max-h-72">
-              <table class="sector-table">
-                <thead>
-                  <tr>
-                    <th>Resp.</th>
-                    <th>Despesa</th>
-                    <th class="text-right">Valor</th>
-                    <th class="text-right no-print"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rows.map(tx => {
-                    const ownerMeta = getOwnerMeta(tx.owner);
-                    const fullAmt = parseAmountValue(tx.amount);
-                    const ownerBadgeLabel = ownerMeta.id === 'casal'
-                      ? `Casal • ${formatCurrency(fullAmt / 2)} cada`
-                      : ownerMeta.label;
-                    return `
-                      <tr>
-                        <td><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ownerMeta.badge}">${ownerBadgeLabel}</span></td>
-                        <td class="font-semibold">${escapeHtml(tx.merchant)}</td>
-                        <td class="text-right font-bold text-red-500 whitespace-nowrap">${formatCurrency(fullAmt)}</td>
-                        <td class="text-right whitespace-nowrap no-print">
-                          <button onclick="editTransaction('${tx.id}')" class="p-1 text-slate-400 hover:text-white"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
-                          <button onclick="deleteTransaction('${tx.id}')" class="p-1 text-slate-400 hover:text-red-500"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-                        </td>
-                      </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
             </div>
           `}
         </div>
 
         <!-- Rodapé do Setor -->
         <div class="px-4 py-2.5 bg-slate-50/90 dark:bg-slate-900/70 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs font-bold">
-          <span class="text-slate-500 dark:text-slate-400">Subtotal (${rows.length} itens)</span>
+          <span class="text-slate-500 dark:text-slate-400">Subtotal (${rows.length} ${rows.length === 1 ? 'item' : 'itens'})</span>
           <span class="text-sm font-extrabold text-slate-900 dark:text-white">${formatCurrency(filteredSubtotal)}</span>
         </div>
       </div>

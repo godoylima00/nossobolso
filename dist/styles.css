@@ -277,10 +277,24 @@ body {
   100% { top: 4%; }
 }
 
-/* Mobile Bottom Nav Safe Padding */
+/* Mobile Bottom Nav Safe Padding & Input Overflow Guard */
+.mobile-bottom-nav {
+  padding-bottom: max(1.75rem, calc(1rem + env(safe-area-inset-bottom, 0px)));
+}
+
+input[type="date"],
+input[type="time"],
+input[type="number"],
+input[type="text"],
+select {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 @media (max-width: 1023px) {
   .main-content-wrapper {
-    padding-bottom: 5.5rem !important;
+    padding-bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 

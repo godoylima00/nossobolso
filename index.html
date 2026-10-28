@@ -2,7 +2,7 @@
 <html lang="pt-BR" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Nosso Bolso</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cdefs%3E%3ClinearGradient id='hb' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23a855f7'/%3E%3Cstop offset='55%25' stop-color='%23820ad1'/%3E%3Cstop offset='100%25' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M24 44C24 44 5 31.8 5 18C5 11.4 10.2 6.5 16.2 6.5C19.9 6.5 22.6 8.3 24 10.8C25.4 8.3 28.1 6.5 31.8 6.5C37.8 6.5 43 11.4 43 18C43 31.8 24 44 24 44Z' fill='%234c0575'/%3E%3Ctext x='24' y='21' text-anchor='middle' font-family='Inter,Arial,sans-serif' font-weight='900' font-size='21' fill='%2334d399' stroke='%23064e3b' stroke-width='0.8'%3E$%3C/text%3E%3Cpath d='M5.3 19.2Q24 24.5 42.7 19.2C41.8 32.2 24 44 24 44C24 44 6.2 32.2 5.3 19.2Z' fill='url(%23hb)'/%3E%3Cpath d='M8.5 22.2Q24 26.8 39.5 22.2' fill='none' stroke='%23ffffff' stroke-opacity='0.75' stroke-width='1.5' stroke-dasharray='2.5 2.2' stroke-linecap='round'/%3E%3Cpath d='M9.2 23.8C11.2 32.2 24 40.3 24 40.3C24 40.3 36.8 32.2 38.8 23.8' fill='none' stroke='%23ffffff' stroke-opacity='0.55' stroke-width='1.3' stroke-dasharray='2.5 2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
 
@@ -183,7 +183,7 @@
     <!-- ====================================================================
          CONTEÚDO PRINCIPAL
          ==================================================================== -->
-    <main class="flex-1 lg:ml-64 main-content-wrapper p-5 sm:p-7 lg:p-9 max-w-[1600px] w-full mx-auto" id="top-dashboard">
+    <main class="flex-1 lg:ml-64 main-content-wrapper p-5 sm:p-7 lg:p-9 pb-32 lg:pb-9 max-w-[1600px] w-full mx-auto overflow-x-hidden" id="top-dashboard">
 
       <!-- Cabeçalho Superior Limpo: Título + Seletor de Mês + Botão Discreto Exportar -->
       <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
@@ -586,7 +586,7 @@
   <!-- ====================================================================
        MENU INFERIOR RÁPIDO (MOBILE)
        ==================================================================== -->
-  <nav class="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 z-40 px-3 py-2 flex items-center justify-around no-print">
+  <nav class="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 z-40 px-3 pt-2.5 pb-7 flex items-center justify-around no-print mobile-bottom-nav">
     <button onclick="scrollToSection('top-dashboard')" class="flex flex-col items-center gap-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">
       <i data-lucide="wallet" class="w-5 h-5"></i>
       <span>Salários</span>
@@ -615,30 +615,30 @@
   <!-- ====================================================================
        MODAL PRINCIPAL: LEITOR DE PRINTS (OCR) + CONFIRMAÇÃO RÁPIDA
        ==================================================================== -->
-  <div id="scan-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
-    <div class="card-surface w-full max-w-xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[92vh] flex flex-col">
+  <div id="scan-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/75 backdrop-blur-sm overflow-x-hidden">
+    <div class="card-surface w-[95%] max-w-lg mx-auto overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[90vh] flex flex-col box-border">
 
-      <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-xl bg-purple-600/15 text-purple-500 flex items-center justify-center">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 rounded-xl bg-purple-600/15 text-purple-500 flex items-center justify-center shrink-0">
             <i data-lucide="sparkles" class="w-5 h-5"></i>
           </div>
-          <div>
-            <h3 class="font-extrabold text-base">+ Adicionar Print ou Fatura PDF</h3>
-            <p class="text-xs text-slate-400">Envie Faturas PDF (Bradesco Cartões, etc.) ou prints do iFood, Uber, PIX e Notas</p>
+          <div class="min-w-0">
+            <h3 class="font-extrabold text-sm sm:text-base truncate">+ Adicionar Print ou Fatura PDF</h3>
+            <p class="text-[11px] sm:text-xs text-slate-400 truncate">Envie Faturas PDF ou registre gastos manualmente</p>
           </div>
         </div>
-        <button onclick="closeScanModal()" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+        <button onclick="closeScanModal()" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 shrink-0">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <div class="p-6 overflow-y-auto space-y-5">
+      <div class="p-4 sm:p-6 overflow-y-auto overflow-x-hidden space-y-5 w-full box-border">
 
         <!-- ETAPA 1: UPLOAD -->
         <div id="scan-step-upload" class="space-y-5">
           <label id="receipt-dropzone" for="receipt-file-input"
-            class="dropzone-area rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer">
+            class="dropzone-area rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer">
             <div class="w-14 h-14 rounded-2xl bg-purple-600/15 text-purple-500 flex items-center justify-center mb-3">
               <i data-lucide="file-up" class="w-7 h-7"></i>
             </div>
@@ -651,36 +651,36 @@
             <input id="receipt-file-input" type="file" accept="image/*,application/pdf,.pdf" class="hidden" />
           </label>
 
-          <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/70">
+          <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/70">
             <div class="flex items-center justify-between mb-2.5">
               <span class="text-xs font-bold uppercase tracking-wider text-purple-500 flex items-center gap-1.5">
-                <i data-lucide="wand-2" class="w-3.5 h-3.5"></i>
+                <i data-lucide="wand-2" class="w-3.5 h-3.5 shrink-0"></i>
                 <span>Testar leitor com fatura ou comprovante de exemplo:</span>
               </span>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <button type="button" onclick="triggerDemoReceiptOCR('fatura_bradesco')"
-                class="px-2.5 py-2 rounded-xl text-xs font-bold bg-purple-600/15 text-purple-500 hover:border-purple-500 border border-purple-500/30 transition text-center">
+                class="px-2.5 py-2 rounded-xl text-xs font-bold bg-purple-600/15 text-purple-500 hover:border-purple-500 border border-purple-500/30 transition text-center truncate">
                 📄 Fatura Bradesco
               </button>
               <button type="button" onclick="triggerDemoReceiptOCR('ifood')"
-                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-red-500 border border-slate-200 dark:border-slate-700 transition text-center">
+                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-red-500 border border-slate-200 dark:border-slate-700 transition text-center truncate">
                 🍔 Print iFood
               </button>
               <button type="button" onclick="triggerDemoReceiptOCR('uber')"
-                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-slate-400 border border-slate-200 dark:border-slate-700 transition text-center">
+                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-slate-400 border border-slate-200 dark:border-slate-700 transition text-center truncate">
                 🚗 Print Uber
               </button>
               <button type="button" onclick="triggerDemoReceiptOCR('mercado')"
-                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-emerald-500 border border-slate-200 dark:border-slate-700 transition text-center">
+                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-emerald-500 border border-slate-200 dark:border-slate-700 transition text-center truncate">
                 🛒 PIX Mercado
               </button>
               <button type="button" onclick="triggerDemoReceiptOCR('compras')"
-                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-purple-500 border border-slate-200 dark:border-slate-700 transition text-center">
+                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-purple-500 border border-slate-200 dark:border-slate-700 transition text-center truncate">
                 🛍️ Mercado Livre
               </button>
               <button type="button" onclick="triggerDemoReceiptOCR('saude')"
-                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-cyan-500 border border-slate-200 dark:border-slate-700 transition text-center">
+                class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:border-cyan-500 border border-slate-200 dark:border-slate-700 transition text-center truncate">
                 💊 Farmácia
               </button>
             </div>
@@ -689,7 +689,7 @@
           <div class="flex items-center justify-between pt-2">
             <button type="button" onclick="openQuickManualModal('mercado', 'gabriel')"
               class="text-xs font-semibold text-purple-500 hover:underline flex items-center gap-1">
-              <i data-lucide="keyboard" class="w-3.5 h-3.5"></i>
+              <i data-lucide="keyboard" class="w-3.5 h-3.5 shrink-0"></i>
               <span>Prefere digitar manualmente sem print? Clique aqui</span>
             </button>
           </div>
@@ -712,20 +712,20 @@
         </div>
 
         <!-- ETAPA 3: TELA DE CONFIRMAÇÃO RÁPIDA -->
-        <form id="scan-step-confirm" onsubmit="saveConfirmedTransaction(event)" class="hidden space-y-4">
+        <form id="scan-step-confirm" onsubmit="saveConfirmedTransaction(event)" class="hidden space-y-4 w-full max-w-full overflow-x-hidden box-border">
 
           <div id="duplicate-alert-banner"
             class="hidden p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-600 dark:text-amber-300 text-xs flex items-start gap-2.5">
             <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0 text-amber-500"></i>
-            <div>
+            <div class="min-w-0">
               <strong class="font-bold block text-sm">Parece que você já registrou essa compra!</strong>
               <span>Encontramos um lançamento com o mesmo valor, data e estabelecimento neste mês.</span>
             </div>
           </div>
 
-          <div id="confirm-thumb-wrapper" class="flex items-center gap-3.5 p-3 rounded-xl bg-slate-100 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
+          <div id="confirm-thumb-wrapper" class="flex items-center gap-3 p-3 rounded-xl bg-slate-100 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 w-full box-border">
             <img id="confirm-receipt-thumb" src="" alt="Miniatura do Comprovante"
-              class="w-14 h-16 object-cover rounded-lg border border-slate-300 dark:border-slate-600 shrink-0" />
+              class="w-12 h-14 object-cover rounded-lg border border-slate-300 dark:border-slate-600 shrink-0" />
             <div class="flex-1 min-w-0">
               <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-500">
                 ✓ Leitura Concluída
@@ -735,19 +735,19 @@
               </p>
             </div>
             <button type="button" onclick="openScanModal()"
-              class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-slate-700">
-              Trocar Print
+              class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-slate-700 shrink-0">
+              Trocar
             </button>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full box-border">
             <!-- Responsável pela Despesa (Gabriel ou Mirela) -->
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-2 min-w-0 w-full">
               <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
                 De quem é esta despesa? *
               </label>
               <select id="confirm-owner" onchange="validateDuplicateOnConfirmForm()"
-                class="w-full px-3.5 py-2.5 rounded-xl text-sm font-bold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                class="w-full max-w-full min-w-0 box-border px-3.5 py-2.5 rounded-xl text-sm font-bold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
                 <option value="gabriel">👦 Despesas Gabriel</option>
                 <option value="mirela">👩 Despesas Mirela</option>
                 <option value="casal">💑 Ambos / Casal</option>
@@ -755,23 +755,23 @@
             </div>
 
             <!-- Valor Total -->
-            <div>
+            <div class="min-w-0 w-full">
               <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
                 1. Valor Total (R$) *
               </label>
               <input id="confirm-amount" type="number" step="0.01" min="0.01" required
                 oninput="validateDuplicateOnConfirmForm(); updateInstallmentPreview()"
                 placeholder="Ex: 1200.00"
-                class="w-full px-3.5 py-2.5 rounded-xl text-base font-extrabold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                class="w-full max-w-full min-w-0 box-border px-3.5 py-2.5 rounded-xl text-base font-extrabold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
             </div>
 
             <!-- Seleção de Parcelas (1x até 12x) -->
-            <div>
+            <div class="min-w-0 w-full">
               <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
                 Parcelas (1x a 12x)
               </label>
               <select id="confirm-installments" onchange="updateInstallmentPreview()"
-                class="w-full px-3.5 py-2.5 rounded-xl text-sm font-bold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                class="w-full max-w-full min-w-0 box-border px-3.5 py-2.5 rounded-xl text-sm font-bold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
                 <option value="1" selected>1x (À vista)</option>
                 <option value="2">2x sem juros</option>
                 <option value="3">3x sem juros</option>
@@ -785,46 +785,46 @@
                 <option value="11">11x sem juros</option>
                 <option value="12">12x sem juros</option>
               </select>
-              <p id="confirm-installments-preview" class="hidden text-[11px] font-bold text-purple-400 mt-1"></p>
+              <p id="confirm-installments-preview" class="hidden text-[11px] font-bold text-purple-400 mt-1 break-words"></p>
             </div>
 
             <!-- Nome do Estabelecimento / Despesa -->
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-2 min-w-0 w-full">
               <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
                 2. Nome da Despesa / Estabelecimento *
               </label>
               <input id="confirm-merchant" type="text" required
                 oninput="autoClassifyConfirmMerchant(this.value)"
                 placeholder="Ex: Geladeira, Apartamento, Nubank, iFood, Uber..."
-                class="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                class="w-full max-w-full min-w-0 box-border px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
             </div>
 
             <!-- Data -->
-            <div>
+            <div class="min-w-0 w-full">
               <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
                 3. Data *
               </label>
               <input id="confirm-date" type="date" required
                 onchange="validateDuplicateOnConfirmForm()"
-                class="w-full px-3.5 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700" />
+                class="w-full max-w-full min-w-0 box-border px-3.5 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700" />
             </div>
 
             <!-- Hora -->
-            <div>
+            <div class="min-w-0 w-full">
               <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
                 Hora
               </label>
               <input id="confirm-time" type="time"
-                class="w-full px-3.5 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700" />
+                class="w-full max-w-full min-w-0 box-border px-3.5 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700" />
             </div>
 
             <!-- Categoria Sugerida -->
-            <div>
+            <div class="min-w-0 w-full">
               <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
                 4. Categoria / Setor *
               </label>
               <select id="confirm-sector"
-                class="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
+                class="w-full max-w-full min-w-0 box-border px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
                 <option value="mercado">🏠 Mercado, Casa & Contas</option>
                 <option value="compras">💳 Cartões, Bancos & Compras</option>
                 <option value="delivery">🍔 Delivery & Alimentação</option>
@@ -834,12 +834,12 @@
             </div>
 
             <!-- Forma de Pagamento -->
-            <div>
+            <div class="min-w-0 w-full">
               <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
                 5. Forma de Pagamento *
               </label>
               <select id="confirm-payment"
-                class="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
+                class="w-full max-w-full min-w-0 box-border px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
                 <option value="PIX">⚡ PIX</option>
                 <option value="Cartão de Crédito">💳 Cartão de Crédito</option>
                 <option value="Cartão de Débito">🏦 Cartão de Débito</option>
@@ -849,14 +849,14 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-slate-800">
             <button type="button" onclick="closeScanModal()"
-              class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              class="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-center">
               Cancelar
             </button>
             <button type="submit"
-              class="px-6 py-2.5 rounded-xl cta-scan-btn text-xs sm:text-sm font-bold flex items-center gap-2">
-              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+              class="w-full sm:w-auto px-6 py-2.5 rounded-xl cta-scan-btn text-xs sm:text-sm font-bold flex items-center justify-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4 shrink-0"></i>
               <span>Confirmar Lançamento</span>
             </button>
           </div>

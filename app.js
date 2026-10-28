@@ -890,7 +890,7 @@ function renderCoupleHorizontalBoards(summary) {
                 <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                 <span>+ Despesa</span>
               </button>
-              <button onclick="clearPersonMonthExpenses('${personKey}')"
+              <button onclick="setDeleteTarget('${personKey === 'gabriel' ? 'Gabriel' : 'Mirela'}')"
                 title="Apagar todas as despesas de ${title} neste mês"
                 class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-500 dark:text-red-400 border border-red-500/25 transition flex items-center gap-1">
                 <span>🗑️ Limpar Tudo</span>
@@ -2749,24 +2749,36 @@ window.togglePersonCategoryAccordion = function(personKey, sectorId) {
   renderAll();
 };
 
-let isDeleteAllModalOpen = false;
-let pendingDeleteModalTarget = 'all';
+let deleteTarget = null;
 
-window.openDeleteAllModal = function(target = 'all') {
-  isDeleteAllModalOpen = true;
-  pendingDeleteModalTarget = target;
-
+window.setDeleteTarget = function(target = null) {
   const modalEl = document.getElementById('delete-all-confirm-modal');
   const titleEl = document.getElementById('delete-all-modal-title');
   const descEl = document.getElementById('delete-all-modal-desc');
+
+  if (!target) {
+    deleteTarget = null;
+    if (modalEl) modalEl.classList.add('hidden');
+    return;
+  }
+
+  const normalized = String(target).toLowerCase();
+  if (normalized === 'gabriel') {
+    deleteTarget = 'Gabriel';
+  } else if (normalized === 'mirela') {
+    deleteTarget = 'Mirela';
+  } else {
+    deleteTarget = 'all';
+  }
 
   if (titleEl) {
     titleEl.textContent = 'Tem certeza absoluta?';
   }
   if (descEl) {
-    if (target === 'gabriel' || target === 'mirela') {
-      const labelPerson = target === 'gabriel' ? 'Gabriel' : 'Mirela';
-      descEl.textContent = `Isso apagará TODOS os gastos de ${labelPerson} registrados neste mês. Esta ação não pode ser desfeita.`;
+    if (deleteTarget === 'Gabriel') {
+      descEl.textContent = 'Isso apagará TODOS os gastos registrados neste mês para Gabriel. Esta ação não pode ser desfeita.';
+    } else if (deleteTarget === 'Mirela') {
+      descEl.textContent = 'Isso apagará TODOS os gastos registrados neste mês para Mirela. Esta ação não pode ser desfeita.';
     } else {
       descEl.textContent = 'Isso apagará TODOS os gastos registrados neste mês para ambos. Esta ação não pode ser desfeita.';
     }
@@ -2780,21 +2792,23 @@ window.openDeleteAllModal = function(target = 'all') {
   }
 };
 
+window.openDeleteAllModal = function(target = 'all') {
+  window.setDeleteTarget(target);
+};
+
 window.closeDeleteAllModal = function() {
-  isDeleteAllModalOpen = false;
-  const modalEl = document.getElementById('delete-all-confirm-modal');
-  if (modalEl) {
-    modalEl.classList.add('hidden');
-  }
+  window.setDeleteTarget(null);
 };
 
 window.confirmExecuteDeleteAll = function() {
-  if (!isDeleteAllModalOpen) return;
-  const target = pendingDeleteModalTarget;
-  closeDeleteAllModal();
+  if (!deleteTarget) return;
+  const currentTarget = deleteTarget;
+  window.setDeleteTarget(null);
 
-  if (target === 'gabriel' || target === 'mirela') {
-    executeClearPersonMonthExpenses(target);
+  if (currentTarget === 'Gabriel') {
+    executeClearPersonMonthExpenses('gabriel');
+  } else if (currentTarget === 'Mirela') {
+    executeClearPersonMonthExpenses('mirela');
   } else {
     executeClearCurrentMonthData();
   }
@@ -2802,21 +2816,7 @@ window.confirmExecuteDeleteAll = function() {
 
 window.clearPersonMonthExpenses = function(personKey) {
   const targetOwner = (personKey || 'gabriel').toLowerCase();
-  const labelPerson = targetOwner === 'gabriel' ? 'Gabriel' : 'Mirela';
-  const month = appState.currentMonth;
-
-  const monthTxs = getMonthTransactions(month);
-  const hasPersonTxs = monthTxs.some(tx => {
-    const o = (tx.owner || 'casal').toLowerCase();
-    return o === targetOwner || o === 'casal';
-  });
-
-  if (!hasPersonTxs) {
-    showToast(`Não há despesas de ${labelPerson} em ${formatMonthLabel(month)} para limpar.`, 'info');
-    return;
-  }
-
-  openDeleteAllModal(targetOwner);
+  window.setDeleteTarget(targetOwner === 'gabriel' ? 'Gabriel' : 'Mirela');
 };
 
 function executeClearPersonMonthExpenses(personKey) {

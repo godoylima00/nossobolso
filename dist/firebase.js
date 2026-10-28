@@ -460,6 +460,49 @@ try {
     }
   }
 
+  async function insertBatchTransactions(txArray = []) {
+    if (!isConfigured || !supabaseClient || !Array.isArray(txArray) || txArray.length === 0) {
+      return false;
+    }
+    try {
+      const arrayDeDespesas = txArray.map(tx => {
+        const yyyyMM = (tx.date || '').slice(0, 7) || new Date().toISOString().slice(0, 7);
+        const mesAno = tx.mes_ano || toMesAnoLabel(yyyyMM);
+        const safeImage =
+          tx.imageDataUrl && tx.imageDataUrl.length < 500000 ? tx.imageDataUrl : null;
+        const roundedVal = Number((Number(tx.amount) || 0).toFixed(2));
+
+        return {
+          id: String(tx.id),
+          nome: String(tx.merchant || 'Despesa').trim(),
+          valor: roundedVal,
+          setor: tx.sector || 'mercado',
+          responsavel: (tx.owner || 'casal').toLowerCase().trim(),
+          mes_ano: mesAno,
+          referencia_iso: yyyyMM,
+          data: tx.date || `${yyyyMM}-05`,
+          hora: tx.time || '12:00',
+          forma_pagamento: tx.paymentMethod || 'PIX',
+          is_recurring: Boolean(tx.isRecurring),
+          subscription_id: tx.subscriptionId || null,
+          image_data_url: safeImage,
+          image_signature: tx.imageSignature || null,
+          updated_at: Date.now()
+        };
+      });
+
+      const { error } = await supabaseClient.from('despesas').insert(arrayDeDespesas);
+      if (error) {
+        console.warn('[SupabaseDB] Fallback upsert para lote de despesas:', error.message);
+        await supabaseClient.from('despesas').upsert(arrayDeDespesas);
+      }
+      return true;
+    } catch (err) {
+      console.error('[SupabaseDB] Erro no insert em lote de despesas:', err);
+      return false;
+    }
+  }
+
   async function upsertMultipleTransactions(txArray = []) {
     if (!isConfigured || !supabaseClient || !Array.isArray(txArray) || txArray.length === 0) {
       return false;
@@ -467,14 +510,15 @@ try {
     try {
       const rows = txArray.map(tx => {
         const yyyyMM = (tx.date || '').slice(0, 7) || new Date().toISOString().slice(0, 7);
-        const mesAno = toMesAnoLabel(yyyyMM);
+        const mesAno = tx.mes_ano || toMesAnoLabel(yyyyMM);
         const safeImage =
           tx.imageDataUrl && tx.imageDataUrl.length < 500000 ? tx.imageDataUrl : null;
+        const roundedVal = Number((Number(tx.amount) || 0).toFixed(2));
 
         return {
           id: String(tx.id),
           nome: String(tx.merchant || 'Despesa').trim(),
-          valor: Number(tx.amount) || 0,
+          valor: roundedVal,
           setor: tx.sector || 'mercado',
           responsavel: (tx.owner || 'casal').toLowerCase().trim(),
           mes_ano: mesAno,
@@ -597,6 +641,7 @@ try {
     saveMonthMeta,
     saveMonthlySalary,
     upsertTransaction,
+    insertBatchTransactions,
     upsertMultipleTransactions,
     deleteTransactionById,
     deleteMultipleTransactionsByIds,

@@ -1852,7 +1852,55 @@ function openConfirmStepWithData(data) {
     ownerSelect.value = data.owner || 'gabriel';
   }
 
+  const installmentsSelect = document.getElementById('confirm-installments');
+  if (installmentsSelect) {
+    installmentsSelect.value = '1';
+    installmentsSelect.disabled = Boolean(pendingReceiptData.editingId);
+  }
+  updateInstallmentPreview();
   validateDuplicateOnConfirmForm();
+}
+
+window.updateInstallmentPreview = function() {
+  const installmentsEl = document.getElementById('confirm-installments');
+  const previewEl = document.getElementById('confirm-installments-preview');
+  const amountVal = parseAmountValue(document.getElementById('confirm-amount')?.value);
+  const installments = Math.min(12, Math.max(1, parseInt(installmentsEl?.value, 10) || 1));
+
+  if (!previewEl) return;
+
+  if (installments > 1) {
+    const paymentSelect = document.getElementById('confirm-payment');
+    if (paymentSelect && paymentSelect.value === 'PIX') {
+      paymentSelect.value = 'Cartão de Crédito';
+    }
+    const perMonth = amountVal > 0 ? Number((amountVal / installments).toFixed(2)) : 0;
+    previewEl.classList.remove('hidden');
+    previewEl.textContent = amountVal > 0
+      ? `📅 ${installments}x de ${formatCurrency(perMonth)} projetadas nos próximos meses`
+      : `📅 Compra será dividida em ${installments} parcelas mensais`;
+  } else {
+    previewEl.classList.add('hidden');
+    previewEl.textContent = '';
+  }
+};
+
+function addMonthsToIsoDate(baseIsoDate, monthsToAdd) {
+  const parts = String(baseIsoDate || '').split('-').map(Number);
+  const baseY = parts[0] || new Date().getFullYear();
+  const baseM = (parts[1] || (new Date().getMonth() + 1)) - 1;
+  const baseD = parts[2] || 5;
+
+  const targetMonthDate = new Date(baseY, baseM + monthsToAdd, 1);
+  const y = targetMonthDate.getFullYear();
+  const m = targetMonthDate.getMonth() + 1;
+  const maxDayInMonth = new Date(y, m, 0).getDate();
+  const d = Math.min(baseD, maxDayInMonth);
+
+  const yyyyMM = `${y}-${String(m).padStart(2, '0')}`;
+  const mesAno = `${String(m).padStart(2, '0')}-${y}`;
+  const fullDate = `${yyyyMM}-${String(d).padStart(2, '0')}`;
+  return { yyyyMM, mesAno, fullDate };
 }
 
 window.validateDuplicateOnConfirmForm = function() {
@@ -1889,7 +1937,7 @@ window.autoClassifyConfirmMerchant = function(merchantVal) {
 window.saveConfirmedTransaction = function(e) {
   if (e) e.preventDefault();
 
-  const amount = parseAmountValue(document.getElementById('confirm-amount').value);
+  const amount = Number(parseAmountValue(document.getElementById('confirm-amount').value).toFixed(2));
   const date = document.getElementById('confirm-date').value;
   const time = document.getElementById('confirm-time').value || '12:00';
   const rawMerchant = document.getElementById('confirm-merchant').value.trim() || 'Despesa Registrada';
@@ -1897,6 +1945,7 @@ window.saveConfirmedTransaction = function(e) {
   const sector = document.getElementById('confirm-sector').value;
   const paymentMethod = document.getElementById('confirm-payment').value;
   const owner = document.getElementById('confirm-owner')?.value || 'gabriel';
+  const installments = Math.min(12, Math.max(1, parseInt(document.getElementById('confirm-installments')?.value, 10) || 1));
 
   if (isNaN(amount) || amount <= 0) {
     showToast('Informe um valor válido maior que R$ 0,00.', 'danger');
@@ -1907,10 +1956,12 @@ window.saveConfirmedTransaction = function(e) {
     const idx = appState.transactions.findIndex(t => t.id === pendingReceiptData.editingId);
     if (idx !== -1) {
       const existingTx = appState.transactions[idx];
+      const { mesAno } = addMonthsToIsoDate(date, 0);
       appState.transactions[idx] = {
         ...existingTx,
         amount,
         date,
+        mes_ano: mesAno,
         time,
         merchant,
         owner,
@@ -1948,20 +1999,34 @@ window.saveConfirmedTransaction = function(e) {
       showToast('Lançamento atualizado com sucesso!');
     }
   } else {
-    const newTx = {
-      id: 'tx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-      amount,
-      date,
-      time,
-      merchant,
-      owner,
-      sector,
-      paymentMethod,
-      imageDataUrl: pendingReceiptData.imageDataUrl,
-      imageSignature: pendingReceiptData.imageSignature,
-      isRecurring: false
-    };
-    appState.transactions.unshift(newTx);
+    const cleanBaseMerchant = merchant.replace(/\s*\(\d+\/\d+\)\s*$/, '').trim();
+    const installmentAmount = Number((amount / installments).toFixed(2));
+    const baseTimestamp = Date.now();
+    const arrayDeDespesas = [];
+
+    for (let i = 0; i < installments; i++) {
+      const { mesAno, fullDate } = addMonthsToIsoDate(date, i);
+      const itemMerchant = installments > 1
+        ? `${cleanBaseMerchant} (${i + 1}/${installments})`
+        : cleanBaseMerchant;
+
+      arrayDeDespesas.push({
+        id: `tx_${baseTimestamp}_${i + 1}_${Math.random().toString(36).slice(2, 6)}`,
+        amount: installmentAmount,
+        date: fullDate,
+        mes_ano: mesAno,
+        time,
+        merchant: itemMerchant,
+        owner,
+        sector,
+        paymentMethod,
+        imageDataUrl: i === 0 ? pendingReceiptData.imageDataUrl : null,
+        imageSignature: i === 0 ? pendingReceiptData.imageSignature : null,
+        isRecurring: false
+      });
+    }
+
+    appState.transactions.unshift(...arrayDeDespesas);
 
     const txMonth = date.slice(0, 7);
     if (txMonth && txMonth.length === 7 && txMonth !== appState.currentMonth) {
@@ -1969,10 +2034,21 @@ window.saveConfirmedTransaction = function(e) {
     }
 
     if (window.CloudDB && window.CloudDB.isConfigured()) {
-      window.CloudDB.upsertTransaction(newTx);
+      if (typeof window.CloudDB.insertBatchTransactions === 'function') {
+        window.CloudDB.insertBatchTransactions(arrayDeDespesas);
+      } else {
+        window.CloudDB.upsertMultipleTransactions(arrayDeDespesas);
+      }
       window.CloudDB.saveMonthMeta(appState);
     }
-    showToast(`Gasto de ${formatCurrency(amount)} (${merchant}) registrado!`);
+
+    if (installments > 1) {
+      showToast(
+        `Compra parcelada em ${installments}x de ${formatCurrency(installmentAmount)} (${cleanBaseMerchant}) lançada para os próximos meses!`
+      );
+    } else {
+      showToast(`Gasto de ${formatCurrency(amount)} (${cleanBaseMerchant}) registrado!`);
+    }
   }
 
   saveState();

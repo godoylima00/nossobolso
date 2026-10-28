@@ -240,7 +240,7 @@ try {
       notifyStatus('connected', 'Sincronizado em tempo real (Supabase Cloud)');
 
       if (typeof onStateChangeCallback === 'function') {
-        onStateChangeCallback(
+        await onStateChangeCallback(
           {
             meta: memoryCache.meta,
             monthlySalaries: memoryCache.salariesByMonth,
@@ -253,6 +253,9 @@ try {
     } catch (err) {
       console.error('[SupabaseDB] Erro ao carregar dados:', err);
       notifyStatus('error', 'Erro ao consultar tabelas do Supabase.');
+    } finally {
+      const skeletonEl = document.getElementById('cloud-loading-skeleton');
+      if (skeletonEl) skeletonEl.classList.add('hidden');
     }
   }
 

@@ -244,53 +244,84 @@ function updateCloudStatusUI({ status, message }) {
  * Inicializa a sincronização em Tempo Real (Supabase) com fallback automático para localStorage
  */
 function initCloudPersistence() {
+  let isCheckingCloud = true;
+  const finishLoadingState = () => {
+    isCheckingCloud = false;
+    const skeletonEl = document.getElementById('cloud-loading-skeleton');
+    if (skeletonEl) skeletonEl.classList.add('hidden');
+  };
+
   const tryInit = () => {
     if (window.CloudDB && typeof window.CloudDB.initCloudDatabase === 'function') {
-      window.CloudDB.initCloudDatabase({
-        onStatusChange: (statusInfo) => {
-          updateCloudStatusUI(statusInfo);
-        },
-        onStateChange: async (cloudData, { isFirstLoad }) => {
-          const cloudEmpty =
-            (!cloudData.transactions || cloudData.transactions.length === 0) &&
-            (!cloudData.subscriptions || cloudData.subscriptions.length === 0) &&
-            Object.keys(cloudData.monthlySalaries || {}).length === 0;
-
-          const localHasData =
-            (appState.transactions && appState.transactions.length > 0) ||
-            (appState.subscriptions && appState.subscriptions.length > 0) ||
-            Object.keys(appState.monthlySalaries || {}).length > 0;
-
-          // Se o Supabase acabou de conectar pela 1ª vez e está vazio, mas há dados locais, envia para a nuvem automaticamente!
-          if (isFirstLoad && cloudEmpty && localHasData) {
-            await window.CloudDB.syncFullStateToCloud(appState);
-            showToast('Seus dados locais foram migrados automaticamente para o Supabase!', 'success');
-            return;
-          }
-
-          if (cloudData.meta) {
-            if (cloudData.meta.sectorLimits) {
-              appState.sectorLimits = { ...appState.sectorLimits, ...cloudData.meta.sectorLimits };
+      try {
+        window.CloudDB.initCloudDatabase({
+          onStatusChange: (statusInfo) => {
+            try {
+              updateCloudStatusUI(statusInfo);
+            } catch (err) {
+              console.error('[CloudDB] Erro ao atualizar UI de status:', err);
+            } finally {
+              if (statusInfo && statusInfo.status !== 'loading') {
+                finishLoadingState();
+              }
             }
-            if (cloudData.meta.dismissedRecurringByMonth) {
-              appState.dismissedRecurringByMonth = cloudData.meta.dismissedRecurringByMonth;
+          },
+          onStateChange: async (cloudData, { isFirstLoad } = {}) => {
+            try {
+              const safeCloud = cloudData || {};
+              const cloudEmpty =
+                (!Array.isArray(safeCloud.transactions) || safeCloud.transactions.length === 0) &&
+                (!Array.isArray(safeCloud.subscriptions) || safeCloud.subscriptions.length === 0) &&
+                Object.keys(safeCloud.monthlySalaries || {}).length === 0;
+
+              const localHasData =
+                (Array.isArray(appState.transactions) && appState.transactions.length > 0) &&
+                (Array.isArray(appState.subscriptions) && appState.subscriptions.length > 0) ||
+                Object.keys(appState.monthlySalaries || {}).length > 0;
+
+              // Se o Supabase acabou de conectar pela 1ª vez e está vazio, mas há dados locais, envia para a nuvem automaticamente!
+              if (isFirstLoad && cloudEmpty && localHasData) {
+                await window.CloudDB.syncFullStateToCloud(appState);
+                showToast('Seus dados locais foram migrados automaticamente para o Supabase!', 'success');
+                return;
+              }
+
+              if (safeCloud.meta) {
+                if (safeCloud.meta.sectorLimits) {
+                  appState.sectorLimits = { ...appState.sectorLimits, ...safeCloud.meta.sectorLimits };
+                }
+                if (safeCloud.meta.dismissedRecurringByMonth) {
+                  appState.dismissedRecurringByMonth = safeCloud.meta.dismissedRecurringByMonth;
+                }
+              }
+
+              if (safeCloud.monthlySalaries) {
+                appState.monthlySalaries = safeCloud.monthlySalaries;
+              }
+              if (Array.isArray(safeCloud.subscriptions)) {
+                appState.subscriptions = safeCloud.subscriptions;
+              }
+              if (Array.isArray(safeCloud.transactions)) {
+                appState.transactions = safeCloud.transactions;
+              }
+
+              saveState();
+              renderAll();
+            } catch (err) {
+              console.error('[CloudDB] Erro ao processar dados recebidos do Supabase:', err);
+            } finally {
+              finishLoadingState();
             }
           }
-
-          if (cloudData.monthlySalaries) {
-            appState.monthlySalaries = cloudData.monthlySalaries;
-          }
-          if (Array.isArray(cloudData.subscriptions)) {
-            appState.subscriptions = cloudData.subscriptions;
-          }
-          if (Array.isArray(cloudData.transactions)) {
-            appState.transactions = cloudData.transactions;
-          }
-
-          saveState();
-          renderAll();
-        }
-      });
+        });
+      } catch (err) {
+        console.error('[CloudDB] Falha na inicialização do Supabase:', err);
+        updateCloudStatusUI({
+          status: 'error',
+          message: 'Erro ao inicializar conexão com o Supabase.'
+        });
+        finishLoadingState();
+      }
       return true;
     }
     return false;
@@ -306,6 +337,7 @@ function initCloudPersistence() {
       clearInterval(pollInterval);
     } else if (attempts >= 40) {
       clearInterval(pollInterval);
+      finishLoadingState();
       updateCloudStatusUI({
         status: 'unconfigured',
         message: 'Banco de Dados não configurado. Adicione suas chaves do Supabase no arquivo .env'
@@ -344,9 +376,15 @@ function formatCurrency(value) {
 }
 
 function formatDateBR(isoDate = '') {
-  if (!isoDate || !isoDate.includes('-')) return isoDate;
+  if (!isoDate || typeof isoDate !== 'string' || !isoDate.includes('-')) return isoDate || '--/--/----';
   const [y, m, d] = isoDate.split('-');
   return `${d}/${m}/${y}`;
+}
+
+function formatShortDayMonth(isoDate = '') {
+  if (!isoDate || typeof isoDate !== 'string' || !isoDate.includes('-')) return '--/--';
+  const parts = isoDate.split('-');
+  return `${parts[2] || '01'}/${parts[1] || '01'}`;
 }
 
 function formatMonthLabel(yyyyMM) {
@@ -652,8 +690,12 @@ function applyTheme() {
 }
 
 function renderAll() {
-  applyTheme();
-  ensureRecurringTransactionsForMonth(appState.currentMonth);
+  try {
+    applyTheme();
+    ensureRecurringTransactionsForMonth(appState.currentMonth);
+  } catch (err) {
+    console.error('[Render] Erro ao preparar estado mensal:', err);
+  }
 
   const summary = calculateMonthlySummary(appState.currentMonth);
   const prevMonth = getPreviousMonth(appState.currentMonth);
@@ -665,25 +707,47 @@ function renderAll() {
   }
 
   // 1. Renderiza Seção de Salários (Individual Gabriel + Individual Mirela + Casal Juntos)
-  renderSalariesAndTopCards(summary, prevSummary);
+  try {
+    renderSalariesAndTopCards(summary, prevSummary);
+  } catch (err) {
+    console.error('[Render] Erro em renderSalariesAndTopCards:', err);
+  }
 
   // 2. Renderiza Quadro Horizontal Lado a Lado: DESPESAS GABRIEL | DESPESAS MIRELA
-  renderCoupleHorizontalBoards(summary);
+  try {
+    renderCoupleHorizontalBoards(summary);
+  } catch (err) {
+    console.error('[Render] Erro em renderCoupleHorizontalBoards:', err);
+  }
 
-  // 3. Renderiza Abas Rápidas de Setor
-  renderSectorFilterTabs(summary);
+  // 3. Renderiza Seção de Assinaturas e Gastos Fixos Recorrentes
+  try {
+    renderSubscriptionsSection();
+  } catch (err) {
+    console.error('[Render] Erro em renderSubscriptionsSection:', err);
+  }
 
-  // 4. Renderiza Tabelas de Setores na HORIZONTAL
-  renderSectorTables(summary);
+  // 4. Renderiza Gráficos Interativos
+  try {
+    renderCharts(summary, prevSummary);
+  } catch (err) {
+    console.error('[Render] Erro em renderCharts:', err);
+  }
 
-  // 5. Renderiza Gráficos Interativos
-  renderCharts(summary, prevSummary);
+  // 5. Renderiza Abas Rápidas e Grid de Gastos por Setor
+  try {
+    renderSectorFilterTabs(summary);
+    renderSectorTables(summary);
+  } catch (err) {
+    console.error('[Render] Erro em renderSectorTables:', err);
+  }
 
-  // 6. Renderiza Seção de Assinaturas e Gastos Fixos Recorrentes
-  renderSubscriptionsSection();
-
-  if (window.lucide) {
-    window.lucide.createIcons();
+  try {
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+  } catch (err) {
+    console.error('[Render] Erro ao criar ícones Lucide:', err);
   }
 }
 
@@ -1043,13 +1107,13 @@ function renderSectorTables(summary) {
     ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6'
     : 'grid grid-cols-1 max-w-3xl gap-6';
 
-  wrapper.innerHTML = visibleSectors.map(sector => {
-    const secData = summary.bySector[sector.id];
-    const filterState = appState.tableFilters[sector.id] || { search: '', sort: 'recent', payment: 'all', collapsed: false };
+  wrapper.innerHTML = (visibleSectors || []).map(sector => {
+    const secData = summary?.bySector?.[sector.id] || { total: 0, limit: sector.defaultLimit, transactions: [] };
+    const filterState = appState.tableFilters?.[sector.id] || { search: '', sort: 'recent', payment: 'all', collapsed: false };
     const limit = Number(secData.limit) || sector.defaultLimit;
-    const spent = secData.total;
+    const spent = Number(secData.total) || 0;
     const limitPct = limit > 0 ? (spent / limit) * 100 : 0;
-    const shareOfTotalMonth = summary.totalExpense > 0 ? (spent / summary.totalExpense) * 100 : 0;
+    const shareOfTotalMonth = (summary?.totalExpense || 0) > 0 ? (spent / summary.totalExpense) * 100 : 0;
 
     let barColorClass = 'bg-emerald-500';
     let statusBadgeHtml = `<span class="text-[11px] font-semibold text-emerald-500">Dentro da meta (${limitPct.toFixed(0)}%)</span>`;
@@ -1062,13 +1126,13 @@ function renderSectorTables(summary) {
       statusBadgeHtml = `<span class="text-[11px] font-bold text-amber-500">⚡ Próximo do limite (${limitPct.toFixed(0)}%)</span>`;
     }
 
-    let rows = [...secData.transactions];
-    if (filterState.search.trim() !== '') {
+    let rows = Array.isArray(secData.transactions) ? [...secData.transactions] : [];
+    if ((filterState.search || '').trim() !== '') {
       const q = filterState.search.toLowerCase().trim();
       rows = rows.filter(r =>
-        (r.merchant || '').toLowerCase().includes(q) ||
-        (r.owner || '').toLowerCase().includes(q) ||
-        String(r.amount).includes(q)
+        (r?.merchant || '').toLowerCase().includes(q) ||
+        (r?.owner || '').toLowerCase().includes(q) ||
+        String(r?.amount || '').includes(q)
       );
     }
 
@@ -2995,8 +3059,14 @@ document.addEventListener('DOMContentLoaded', () => {
       window.history.replaceState(null, 'Nosso Bolso', window.location.pathname + window.location.search);
     }
   } catch (e) {}
-  loadState();
-  setupUploadAndPasteListeners();
-  renderAll();
-  initCloudPersistence();
+
+  try {
+    loadState();
+    setupUploadAndPasteListeners();
+    renderAll();
+  } catch (err) {
+    console.error('[App] Erro na inicialização inicial do dashboard:', err);
+  } finally {
+    initCloudPersistence();
+  }
 });

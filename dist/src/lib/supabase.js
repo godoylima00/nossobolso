@@ -196,22 +196,41 @@ try {
         .order('data', { ascending: false });
 
       if (!errDesp && Array.isArray(despesasData)) {
-        memoryCache.transactions = despesasData.map(d => ({
-          id: d.id,
-          merchant: d.nome || 'Despesa',
-          amount: Number(d.valor) || 0,
-          sector: d.setor || 'mercado',
-          owner: (d.responsavel || 'casal').toLowerCase().trim(),
-          mes_ano: d.mes_ano || toMesAnoLabel((d.data || '').slice(0, 7)),
-          date: d.data || '',
-          time: d.hora || '12:00',
-          paymentMethod: d.forma_pagamento || 'PIX',
-          imageDataUrl: d.image_data_url || null,
-          imageSignature: d.image_signature || null,
-          isRecurring: Boolean(d.is_recurring),
-          subscriptionId: d.subscription_id || null,
-          updatedAt: d.updated_at || 0
-        }));
+        memoryCache.transactions = despesasData.map(d => {
+          const rawId = String(d.id || '');
+          let parcId = d.parcelamento_id ? String(d.parcelamento_id) : null;
+          if (!parcId && !d.is_recurring && d.subscription_id && String(d.subscription_id).startsWith('parc_')) {
+            parcId = String(d.subscription_id);
+          }
+          if (!parcId && rawId.startsWith('tx_parc_')) {
+            const parts = rawId.split('_');
+            if (parts.length >= 3) parcId = `parc_${parts[2]}`;
+          }
+          if (!parcId) {
+            const legacyMatch = rawId.match(/^tx_(\d{13})_\d+_[a-z0-9]+$/);
+            if (legacyMatch && /\(\d+\/\d+\)\s*$/.test(String(d.nome || ''))) {
+              parcId = `parc_${legacyMatch[1]}`;
+            }
+          }
+
+          return {
+            id: d.id,
+            merchant: d.nome || 'Despesa',
+            amount: Number(d.valor) || 0,
+            sector: d.setor || 'mercado',
+            owner: (d.responsavel || 'casal').toLowerCase().trim(),
+            mes_ano: d.mes_ano || toMesAnoLabel((d.data || '').slice(0, 7)),
+            date: d.data || '',
+            time: d.hora || '12:00',
+            paymentMethod: d.forma_pagamento || 'PIX',
+            imageDataUrl: d.image_data_url || null,
+            imageSignature: d.image_signature || null,
+            isRecurring: Boolean(d.is_recurring),
+            subscriptionId: d.is_recurring ? (d.subscription_id || null) : null,
+            parcelamento_id: parcId,
+            updatedAt: d.updated_at || 0
+          };
+        });
       }
 
       // 4. gastos_fixos
@@ -435,8 +454,9 @@ try {
       const mesAno = toMesAnoLabel(yyyyMM);
       const safeImage =
         tx.imageDataUrl && tx.imageDataUrl.length < 500000 ? tx.imageDataUrl : null;
+      const parcId = tx.parcelamento_id || null;
 
-      await supabaseClient.from('despesas').upsert({
+      const row = {
         id: String(tx.id),
         nome: String(tx.merchant || 'Despesa').trim(),
         valor: Number(tx.amount) || 0,
@@ -448,11 +468,18 @@ try {
         hora: tx.time || '12:00',
         forma_pagamento: tx.paymentMethod || 'PIX',
         is_recurring: Boolean(tx.isRecurring),
-        subscription_id: tx.subscriptionId || null,
+        subscription_id: tx.isRecurring ? (tx.subscriptionId || null) : (parcId || tx.subscriptionId || null),
+        parcelamento_id: parcId,
         image_data_url: safeImage,
         image_signature: tx.imageSignature || null,
         updated_at: Date.now()
-      });
+      };
+
+      const { error } = await supabaseClient.from('despesas').upsert(row);
+      if (error && String(error.message || '').includes('parcelamento_id')) {
+        const { parcelamento_id, ...fallbackRow } = row;
+        await supabaseClient.from('despesas').upsert(fallbackRow);
+      }
       return true;
     } catch (err) {
       console.error('[SupabaseDB] Erro ao salvar despesa no Supabase:', err);
@@ -471,6 +498,7 @@ try {
         const safeImage =
           tx.imageDataUrl && tx.imageDataUrl.length < 500000 ? tx.imageDataUrl : null;
         const roundedVal = Number((Number(tx.amount) || 0).toFixed(2));
+        const parcId = tx.parcelamento_id || null;
 
         return {
           id: String(tx.id),
@@ -484,7 +512,8 @@ try {
           hora: tx.time || '12:00',
           forma_pagamento: tx.paymentMethod || 'PIX',
           is_recurring: Boolean(tx.isRecurring),
-          subscription_id: tx.subscriptionId || null,
+          subscription_id: tx.isRecurring ? (tx.subscriptionId || null) : (parcId || tx.subscriptionId || null),
+          parcelamento_id: parcId,
           image_data_url: safeImage,
           image_signature: tx.imageSignature || null,
           updated_at: Date.now()
@@ -493,8 +522,16 @@ try {
 
       const { error } = await supabaseClient.from('despesas').insert(arrayDeDespesas);
       if (error) {
-        console.warn('[SupabaseDB] Fallback upsert para lote de despesas:', error.message);
-        await supabaseClient.from('despesas').upsert(arrayDeDespesas);
+        if (String(error.message || '').includes('parcelamento_id')) {
+          const stripped = arrayDeDespesas.map(({ parcelamento_id, ...rest }) => rest);
+          const { error: err2 } = await supabaseClient.from('despesas').insert(stripped);
+          if (err2) {
+            await supabaseClient.from('despesas').upsert(stripped);
+          }
+        } else {
+          console.warn('[SupabaseDB] Fallback upsert para lote de despesas:', error.message);
+          await supabaseClient.from('despesas').upsert(arrayDeDespesas);
+        }
       }
       return true;
     } catch (err) {
@@ -514,6 +551,7 @@ try {
         const safeImage =
           tx.imageDataUrl && tx.imageDataUrl.length < 500000 ? tx.imageDataUrl : null;
         const roundedVal = Number((Number(tx.amount) || 0).toFixed(2));
+        const parcId = tx.parcelamento_id || null;
 
         return {
           id: String(tx.id),
@@ -527,7 +565,8 @@ try {
           hora: tx.time || '12:00',
           forma_pagamento: tx.paymentMethod || 'PIX',
           is_recurring: Boolean(tx.isRecurring),
-          subscription_id: tx.subscriptionId || null,
+          subscription_id: tx.isRecurring ? (tx.subscriptionId || null) : (parcId || tx.subscriptionId || null),
+          parcelamento_id: parcId,
           image_data_url: safeImage,
           image_signature: tx.imageSignature || null,
           updated_at: Date.now()
@@ -536,7 +575,11 @@ try {
 
       for (let i = 0; i < rows.length; i += 100) {
         const chunk = rows.slice(i, i + 100);
-        await supabaseClient.from('despesas').upsert(chunk);
+        const { error } = await supabaseClient.from('despesas').upsert(chunk);
+        if (error && String(error.message || '').includes('parcelamento_id')) {
+          const strippedChunk = chunk.map(({ parcelamento_id, ...rest }) => rest);
+          await supabaseClient.from('despesas').upsert(strippedChunk);
+        }
       }
       return true;
     } catch (err) {
@@ -552,6 +595,37 @@ try {
       return true;
     } catch (err) {
       console.error('[SupabaseDB] Erro ao excluir despesa no Supabase:', err);
+      return false;
+    }
+  }
+
+  async function deleteTransactionsByParcelamentoId(parcelamentoId, fallbackIds = []) {
+    if (!isConfigured || !supabaseClient || !parcelamentoId) return false;
+    try {
+      const { error } = await supabaseClient
+        .from('despesas')
+        .delete()
+        .eq('parcelamento_id', String(parcelamentoId));
+
+      if (error) {
+        console.warn('[SupabaseDB] Aviso ao excluir por parcelamento_id (usando fallback):', error.message);
+      }
+
+      // Garante exclusão também via subscription_id e lista de IDs do lote
+      await supabaseClient
+        .from('despesas')
+        .delete()
+        .eq('subscription_id', String(parcelamentoId));
+
+      if (Array.isArray(fallbackIds) && fallbackIds.length > 0) {
+        await supabaseClient
+          .from('despesas')
+          .delete()
+          .in('id', fallbackIds.map(String));
+      }
+      return true;
+    } catch (err) {
+      console.error('[SupabaseDB] Erro ao excluir parcelamento em lote no Supabase:', err);
       return false;
     }
   }
@@ -644,6 +718,7 @@ try {
     insertBatchTransactions,
     upsertMultipleTransactions,
     deleteTransactionById,
+    deleteTransactionsByParcelamentoId,
     deleteMultipleTransactionsByIds,
     upsertSubscription,
     deleteSubscriptionById,

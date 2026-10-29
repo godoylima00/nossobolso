@@ -2002,6 +2002,11 @@ window.saveConfirmedTransaction = function(e) {
     const cleanBaseMerchant = merchant.replace(/\s*\(\d+\/\d+\)\s*$/, '').trim();
     const installmentAmount = Number((amount / installments).toFixed(2));
     const baseTimestamp = Date.now();
+    const parcelamentoId = installments > 1
+      ? (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? `parc_${crypto.randomUUID()}`
+          : `parc_${baseTimestamp}_${Math.random().toString(36).slice(2, 7)}`)
+      : null;
     const arrayDeDespesas = [];
 
     for (let i = 0; i < installments; i++) {
@@ -2011,7 +2016,10 @@ window.saveConfirmedTransaction = function(e) {
         : cleanBaseMerchant;
 
       arrayDeDespesas.push({
-        id: `tx_${baseTimestamp}_${i + 1}_${Math.random().toString(36).slice(2, 6)}`,
+        id: installments > 1
+          ? `tx_${parcelamentoId}_${i + 1}`
+          : `tx_${baseTimestamp}_1_${Math.random().toString(36).slice(2, 6)}`,
+        parcelamento_id: parcelamentoId,
         amount: installmentAmount,
         date: fullDate,
         mes_ano: mesAno,
@@ -2402,7 +2410,27 @@ window.editTransaction = function(txId) {
   });
 };
 
-window.deleteTransaction = function(txId) {
+let pendingInstallmentDelete = null;
+
+function getTransactionParcelamentoId(tx) {
+  if (!tx) return null;
+  if (tx.parcelamento_id) return String(tx.parcelamento_id);
+  if (!tx.isRecurring && tx.subscriptionId && String(tx.subscriptionId).startsWith('parc_')) {
+    return String(tx.subscriptionId);
+  }
+  const idStr = String(tx.id || '');
+  const parcMatch = idStr.match(/^tx_(parc_[^_]+(?:_[^_]+)?)_\d+$/);
+  if (parcMatch) return parcMatch[1];
+
+  // Suporte retroativo para parcelas criadas antes do parcelamento_id explícito
+  const legacyMatch = idStr.match(/^tx_(\d{13})_\d+_[a-z0-9]+$/);
+  if (legacyMatch && /\(\d+\/\d+\)\s*$/.test(String(tx.merchant || ''))) {
+    return `legacy_parc_${legacyMatch[1]}`;
+  }
+  return null;
+}
+
+function executeSingleTransactionDelete(txId) {
   const idx = appState.transactions.findIndex(t => t.id === txId);
   if (idx === -1) return;
   const removed = appState.transactions[idx];
@@ -2422,6 +2450,93 @@ window.deleteTransaction = function(txId) {
   }
   renderAll();
   showToast(`Despesa "${removed.merchant}" removida.`, 'info');
+}
+
+window.deleteTransaction = function(txId) {
+  const tx = appState.transactions.find(t => t.id === txId);
+  if (!tx) return;
+
+  const parcelamentoId = getTransactionParcelamentoId(tx);
+  if (!parcelamentoId) {
+    executeSingleTransactionDelete(txId);
+    return;
+  }
+
+  const groupInstallments = appState.transactions.filter(
+    t => getTransactionParcelamentoId(t) === parcelamentoId
+  );
+
+  pendingInstallmentDelete = {
+    txId: tx.id,
+    parcelamentoId,
+    merchant: tx.merchant
+  };
+
+  const modal = document.getElementById('delete-installment-modal');
+  const descEl = document.getElementById('delete-installment-modal-desc');
+  if (descEl) {
+    const cleanName = String(tx.merchant || '').replace(/\s*\(\d+\/\d+\)\s*$/, '').trim();
+    descEl.textContent = `Esta é uma compra parcelada (${cleanName} — ${groupInstallments.length} parcela(s) encontrada(s)). Deseja excluir TODAS as parcelas desta compra (incluindo as futuras) ou apenas esta?`;
+  }
+
+  if (modal) {
+    modal.classList.remove('hidden');
+  } else {
+    const confirmAll = window.confirm(
+      'Esta é uma compra parcelada. Deseja excluir TODAS as parcelas desta compra (incluindo as futuras) ou apenas esta?\n\nClique em OK para excluir TODAS as parcelas, ou Cancelar para manter.'
+    );
+    if (confirmAll) {
+      window.confirmDeleteInstallmentAction('all');
+    }
+  }
+};
+
+window.closeDeleteInstallmentModal = function() {
+  pendingInstallmentDelete = null;
+  const modal = document.getElementById('delete-installment-modal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.confirmDeleteInstallmentAction = async function(mode = 'all') {
+  if (!pendingInstallmentDelete) {
+    window.closeDeleteInstallmentModal();
+    return;
+  }
+
+  const { txId, parcelamentoId, merchant } = pendingInstallmentDelete;
+  window.closeDeleteInstallmentModal();
+
+  if (mode === 'single') {
+    executeSingleTransactionDelete(txId);
+    return;
+  }
+
+  // Exclusão em cascata de todas as parcelas vinculadas ao parcelamento_id
+  const toDelete = appState.transactions.filter(
+    t => getTransactionParcelamentoId(t) === parcelamentoId
+  );
+  const removedIds = toDelete.map(t => t.id);
+
+  appState.transactions = appState.transactions.filter(
+    t => getTransactionParcelamentoId(t) !== parcelamentoId
+  );
+
+  saveState();
+  renderAll();
+
+  if (window.CloudDB && window.CloudDB.isConfigured()) {
+    if (typeof window.CloudDB.deleteTransactionsByParcelamentoId === 'function') {
+      await window.CloudDB.deleteTransactionsByParcelamentoId(parcelamentoId, removedIds);
+    } else if (typeof window.CloudDB.deleteMultipleTransactionsByIds === 'function') {
+      await window.CloudDB.deleteMultipleTransactionsByIds(removedIds);
+    }
+  }
+
+  const cleanName = String(merchant || 'Compra parcelada').replace(/\s*\(\d+\/\d+\)\s*$/, '').trim();
+  showToast(
+    `Todas as ${removedIds.length} parcelas de "${cleanName}" foram excluídas!`,
+    'info'
+  );
 };
 
 /* ==========================================================================

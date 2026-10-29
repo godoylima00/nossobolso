@@ -90,16 +90,37 @@ fs.writeFileSync(path.join(srcLibDir, 'supabase.js'), supabaseJs, 'utf-8');
 // 6. Copia os arquivos essenciais para a pasta dist
 const staticFiles = [
   'app.js',
+  'firebase.js',
   'ocr-engine.js',
   'styles.css',
   'supabase-schema.sql',
-  'package.json'
+  'package.json',
+  'logo.jpg'
 ];
 
 for (const file of staticFiles) {
   const srcPath = path.join(rootDir, file);
   if (fs.existsSync(srcPath)) {
     fs.copyFileSync(srcPath, path.join(distDir, file));
+  }
+}
+
+// 6.1 Copia todos os ativos da pasta public/ para a raiz de dist/ (padrão Vercel/Vite) e dist/public/
+const publicSrcDir = path.join(rootDir, 'public');
+const publicDistDir = path.join(distDir, 'public');
+if (fs.existsSync(publicSrcDir)) {
+  fs.mkdirSync(publicDistDir, { recursive: true });
+  const publicFiles = fs.readdirSync(publicSrcDir);
+  for (const f of publicFiles) {
+    const fullSrc = path.join(publicSrcDir, f);
+    if (fs.statSync(fullSrc).isFile()) {
+      fs.copyFileSync(fullSrc, path.join(distDir, f));
+      fs.copyFileSync(fullSrc, path.join(publicDistDir, f));
+      if (f === 'logo.jpg.jpeg') {
+        fs.copyFileSync(fullSrc, path.join(distDir, 'logo.jpg'));
+        fs.copyFileSync(fullSrc, path.join(publicDistDir, 'logo.jpg'));
+      }
+    }
   }
 }
 

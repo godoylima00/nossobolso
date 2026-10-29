@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Nosso Bolso</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cdefs%3E%3ClinearGradient id='hb' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23a855f7'/%3E%3Cstop offset='55%25' stop-color='%23820ad1'/%3E%3Cstop offset='100%25' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M24 44C24 44 5 31.8 5 18C5 11.4 10.2 6.5 16.2 6.5C19.9 6.5 22.6 8.3 24 10.8C25.4 8.3 28.1 6.5 31.8 6.5C37.8 6.5 43 11.4 43 18C43 31.8 24 44 24 44Z' fill='%234c0575'/%3E%3Ctext x='24' y='21' text-anchor='middle' font-family='Inter,Arial,sans-serif' font-weight='900' font-size='21' fill='%2334d399' stroke='%23064e3b' stroke-width='0.8'%3E$%3C/text%3E%3Cpath d='M5.3 19.2Q24 24.5 42.7 19.2C41.8 32.2 24 44 24 44C24 44 6.2 32.2 5.3 19.2Z' fill='url(%23hb)'/%3E%3Cpath d='M8.5 22.2Q24 26.8 39.5 22.2' fill='none' stroke='%23ffffff' stroke-opacity='0.75' stroke-width='1.5' stroke-dasharray='2.5 2.2' stroke-linecap='round'/%3E%3Cpath d='M9.2 23.8C11.2 32.2 24 40.3 24 40.3C24 40.3 36.8 32.2 38.8 23.8' fill='none' stroke='%23ffffff' stroke-opacity='0.55' stroke-width='1.3' stroke-dasharray='2.5 2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="icon" type="image/jpeg" href="/logo.jpg" />
 
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -62,56 +62,9 @@
          BARRA LATERAL (DESKTOP)
          ==================================================================== -->
     <aside class="hidden lg:flex flex-col w-64 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0d1322] fixed inset-y-0 left-0 z-30 no-print">
-      <!-- Logo: Coração-Bolso com $ saindo dele -->
+      <!-- Logo: Bolso em formato de Coração -->
       <div class="p-6 flex items-center gap-3 border-b border-slate-100 dark:border-slate-800/80">
-        <div class="w-11 h-11 shrink-0 flex items-center justify-center drop-shadow-md select-none" title="Nosso Bolso">
-          <svg class="w-11 h-11 overflow-visible" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="pocketHeartFront" x1="6" y1="18" x2="42" y2="44" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#a855f7" />
-                <stop offset="55%" stop-color="#820ad1" />
-                <stop offset="100%" stop-color="#db2777" />
-              </linearGradient>
-              <linearGradient id="pocketHeartBack" x1="6" y1="6" x2="42" y2="26" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#581c87" />
-                <stop offset="100%" stop-color="#4c0575" />
-              </linearGradient>
-              <linearGradient id="dollarPopGrad" x1="18" y1="1" x2="30" y2="24" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#6ee7b7" />
-                <stop offset="50%" stop-color="#10b981" />
-                <stop offset="100%" stop-color="#059669" />
-              </linearGradient>
-              <filter id="dollarGlow" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" flood-color="#022c22" flood-opacity="0.55" />
-              </filter>
-            </defs>
-
-            <!-- Parte de trás do Coração (Interior do Bolso) -->
-            <path d="M24 44C24 44 5 31.8 5 18C5 11.4 10.2 6.5 16.2 6.5C19.9 6.5 22.6 8.3 24 10.8C25.4 8.3 28.1 6.5 31.8 6.5C37.8 6.5 43 11.4 43 18C43 31.8 24 44 24 44Z"
-              fill="url(#pocketHeartBack)" stroke="rgba(255,255,255,0.15)" stroke-width="1" />
-
-            <!-- Símbolo $ saindo de dentro do bolso-coração -->
-            <g filter="url(#dollarGlow)">
-              <text x="24" y="21.5" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="900" font-size="21" fill="url(#dollarPopGrad)" stroke="#ecfdf5" stroke-width="0.9">$</text>
-            </g>
-
-            <!-- Parte da frente do Bolso em formato de Coração (sobrepondo a base do $) -->
-            <path d="M5.2 19C14 23.2 34 23.2 42.8 19C41.8 32.1 24 44 24 44C24 44 6.2 32.1 5.2 19Z"
-              fill="url(#pocketHeartFront)" />
-
-            <!-- Borda superior da abertura do bolso -->
-            <path d="M5.2 19C14 23.2 34 23.2 42.8 19"
-              stroke="rgba(255,255,255,0.35)" stroke-width="1.3" stroke-linecap="round" />
-
-            <!-- Costura tracejada da boca do bolso -->
-            <path d="M8.3 22C15.5 25.4 32.5 25.4 39.7 22"
-              stroke="rgba(255,255,255,0.75)" stroke-width="1.35" stroke-dasharray="2.4 2.2" stroke-linecap="round" />
-
-            <!-- Costura tracejada contornando o bolso-coração -->
-            <path d="M8.8 23.5C10.8 32 24 40.4 24 40.4C24 40.4 37.2 32 39.2 23.5"
-              stroke="rgba(255,255,255,0.55)" stroke-width="1.25" stroke-dasharray="2.4 2.2" stroke-linecap="round" />
-          </svg>
-        </div>
+        <img src="/logo.jpg" alt="Logo Nosso Bolso" class="h-10 w-10 md:h-12 md:w-12 object-contain rounded-md shrink-0" />
         <div>
           <h1 class="font-extrabold text-lg tracking-tight leading-none">Nosso <span class="text-purple-500">Bolso</span></h1>
           <span class="text-[11px] text-slate-400 font-medium">Gabriel &amp; Mirela</span>
@@ -188,14 +141,8 @@
       <!-- Cabeçalho Superior Limpo: Título + Seletor de Mês + Botão Discreto Exportar -->
       <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2.5">
-            <svg class="w-9 h-9 lg:hidden shrink-0 overflow-visible drop-shadow" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M24 44C24 44 5 31.8 5 18C5 11.4 10.2 6.5 16.2 6.5C19.9 6.5 22.6 8.3 24 10.8C25.4 8.3 28.1 6.5 31.8 6.5C37.8 6.5 43 11.4 43 18C43 31.8 24 44 24 44Z" fill="#4c0575" />
-              <text x="24" y="21.5" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="900" font-size="21" fill="#10b981" stroke="#ecfdf5" stroke-width="0.9">$</text>
-              <path d="M5.2 19C14 23.2 34 23.2 42.8 19C41.8 32.1 24 44 24 44C24 44 6.2 32.1 5.2 19Z" fill="url(#pocketHeartFront)" />
-              <path d="M8.3 22C15.5 25.4 32.5 25.4 39.7 22" stroke="rgba(255,255,255,0.75)" stroke-width="1.35" stroke-dasharray="2.4 2.2" stroke-linecap="round" />
-              <path d="M8.8 23.5C10.8 32 24 40.4 24 40.4C24 40.4 37.2 32 39.2 23.5" stroke="rgba(255,255,255,0.55)" stroke-width="1.25" stroke-dasharray="2.4 2.2" stroke-linecap="round" />
-            </svg>
+          <div class="flex items-center gap-3">
+            <img src="/logo.jpg" alt="Logo Nosso Bolso" class="h-10 w-10 md:h-12 md:w-12 object-contain rounded-md shrink-0" />
             <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Nosso <span class="text-purple-500">Bolso</span></h2>
             <!-- Badge de Status da Nuvem em Tempo Real -->
             <button id="cloud-sync-badge" onclick="openSettingsModal()" type="button"

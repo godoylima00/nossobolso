@@ -213,13 +213,21 @@ try {
             }
           }
 
+          const refIso =
+            (d.referencia_iso && /^\d{4}-\d{2}$/.test(String(d.referencia_iso)))
+              ? String(d.referencia_iso)
+              : (fromMesAnoLabel(d.mes_ano) && /^\d{4}-\d{2}$/.test(fromMesAnoLabel(d.mes_ano)))
+                ? fromMesAnoLabel(d.mes_ano)
+                : (d.data || '').slice(0, 7);
+
           return {
             id: d.id,
             merchant: d.nome || 'Despesa',
             amount: Number(d.valor) || 0,
             sector: d.setor || 'mercado',
             owner: (d.responsavel || 'casal').toLowerCase().trim(),
-            mes_ano: d.mes_ano || toMesAnoLabel((d.data || '').slice(0, 7)),
+            referencia_iso: refIso,
+            mes_ano: d.mes_ano || toMesAnoLabel(refIso),
             date: d.data || '',
             time: d.hora || '12:00',
             paymentMethod: d.forma_pagamento || 'PIX',
@@ -447,11 +455,22 @@ try {
     }
   }
 
+  function resolveTransactionMonthIso(tx) {
+    if (tx && tx.referencia_iso && /^\d{4}-\d{2}$/.test(String(tx.referencia_iso))) {
+      return String(tx.referencia_iso);
+    }
+    if (tx && tx.mes_ano) {
+      const converted = fromMesAnoLabel(String(tx.mes_ano));
+      if (/^\d{4}-\d{2}$/.test(converted)) return converted;
+    }
+    return ((tx && tx.date) || '').slice(0, 7) || new Date().toISOString().slice(0, 7);
+  }
+
   async function upsertTransaction(tx) {
     if (!isConfigured || !supabaseClient || !tx || !tx.id) return false;
     try {
-      const yyyyMM = (tx.date || '').slice(0, 7) || new Date().toISOString().slice(0, 7);
-      const mesAno = toMesAnoLabel(yyyyMM);
+      const yyyyMM = resolveTransactionMonthIso(tx);
+      const mesAno = tx.mes_ano || toMesAnoLabel(yyyyMM);
       const safeImage =
         tx.imageDataUrl && tx.imageDataUrl.length < 500000 ? tx.imageDataUrl : null;
       const parcId = tx.parcelamento_id || null;
@@ -493,7 +512,7 @@ try {
     }
     try {
       const arrayDeDespesas = txArray.map(tx => {
-        const yyyyMM = (tx.date || '').slice(0, 7) || new Date().toISOString().slice(0, 7);
+        const yyyyMM = resolveTransactionMonthIso(tx);
         const mesAno = tx.mes_ano || toMesAnoLabel(yyyyMM);
         const safeImage =
           tx.imageDataUrl && tx.imageDataUrl.length < 500000 ? tx.imageDataUrl : null;
@@ -546,7 +565,7 @@ try {
     }
     try {
       const rows = txArray.map(tx => {
-        const yyyyMM = (tx.date || '').slice(0, 7) || new Date().toISOString().slice(0, 7);
+        const yyyyMM = resolveTransactionMonthIso(tx);
         const mesAno = tx.mes_ano || toMesAnoLabel(yyyyMM);
         const safeImage =
           tx.imageDataUrl && tx.imageDataUrl.length < 500000 ? tx.imageDataUrl : null;

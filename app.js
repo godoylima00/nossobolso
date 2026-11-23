@@ -469,6 +469,8 @@ function ensureRecurringTransactionsForMonth(yyyyMM) {
     if (existingIdx === -1) {
       const recTx = {
         id: recurringTxId,
+        referencia_iso: yyyyMM,
+        mes_ano: toMesAnoFromIso(yyyyMM),
         date: `${yyyyMM}-${dayStr}`,
         time: '08:00',
         merchant: cleanMerchant,
@@ -497,6 +499,8 @@ function ensureRecurringTransactionsForMonth(yyyyMM) {
       ) {
         const updatedRecTx = {
           ...curr,
+          referencia_iso: yyyyMM,
+          mes_ano: toMesAnoFromIso(yyyyMM),
           date: expectedDate,
           merchant: cleanMerchant,
           owner: normOwner,
@@ -525,6 +529,29 @@ function ensureRecurringTransactionsForMonth(yyyyMM) {
    Cálculos Dinâmicos do Mês (Gabriel, Mirela e Casal Juntos - Divisão 50/50)
    ========================================================================== */
 
+function toMesAnoFromIso(yyyyMM = '') {
+  if (!yyyyMM || !yyyyMM.includes('-')) return yyyyMM;
+  const parts = yyyyMM.split('-');
+  if (parts[0].length === 4 && parts[1]) {
+    return `${parts[1]}-${parts[0]}`;
+  }
+  return yyyyMM;
+}
+
+function getTransactionMonth(tx) {
+  if (!tx) return '';
+  if (tx.referencia_iso && /^\d{4}-\d{2}$/.test(String(tx.referencia_iso))) {
+    return String(tx.referencia_iso);
+  }
+  if (tx.mes_ano) {
+    const str = String(tx.mes_ano).trim();
+    if (/^\d{4}-\d{2}$/.test(str)) return str;
+    const m = str.match(/^(\d{2})-(\d{4})$/);
+    if (m) return `${m[2]}-${m[1]}`;
+  }
+  return (tx.date || '').slice(0, 7);
+}
+
 function getMonthSalaries(yyyyMM = appState.currentMonth) {
   const entry = appState.monthlySalaries?.[yyyyMM] || { gabriel: 0, mirela: 0 };
   const gabriel = parseAmountValue(entry.gabriel);
@@ -537,7 +564,7 @@ function getMonthSalaries(yyyyMM = appState.currentMonth) {
 }
 
 function getMonthTransactions(yyyyMM = appState.currentMonth) {
-  return appState.transactions.filter(t => t.date && t.date.startsWith(yyyyMM));
+  return appState.transactions.filter(t => getTransactionMonth(t) === yyyyMM);
 }
 
 function calculateMonthlySummary(yyyyMM = appState.currentMonth) {
@@ -1776,6 +1803,8 @@ async function processUploadedImageDataUrl(dataUrl) {
             id: 'tx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
             amount,
             date,
+            referencia_iso: targetMonth,
+            mes_ano: toMesAnoFromIso(targetMonth),
             time: '12:00',
             merchant,
             owner: ownerKey,
@@ -1885,11 +1914,13 @@ window.updateInstallmentPreview = function() {
   }
 };
 
-function addMonthsToIsoDate(baseIsoDate, monthsToAdd) {
-  const parts = String(baseIsoDate || '').split('-').map(Number);
-  const baseY = parts[0] || new Date().getFullYear();
-  const baseM = (parts[1] || (new Date().getMonth() + 1)) - 1;
-  const baseD = parts[2] || 5;
+function addMonthsToIsoDate(baseIsoDate, monthsToAdd, referenceMonthIso = appState.currentMonth) {
+  const dateParts = String(baseIsoDate || '').split('-').map(Number);
+  const baseD = dateParts[2] || 5;
+
+  const refParts = String(referenceMonthIso || baseIsoDate || '').split('-').map(Number);
+  const baseY = refParts[0] || dateParts[0] || new Date().getFullYear();
+  const baseM = (refParts[1] || dateParts[1] || (new Date().getMonth() + 1)) - 1;
 
   const targetMonthDate = new Date(baseY, baseM + monthsToAdd, 1);
   const y = targetMonthDate.getFullYear();
@@ -1899,7 +1930,10 @@ function addMonthsToIsoDate(baseIsoDate, monthsToAdd) {
 
   const yyyyMM = `${y}-${String(m).padStart(2, '0')}`;
   const mesAno = `${String(m).padStart(2, '0')}-${y}`;
-  const fullDate = `${yyyyMM}-${String(d).padStart(2, '0')}`;
+  // Na primeira parcela (ou lançamento avulso), preserva a data real da compra (ex: 27/11 ou 28/11 lançada na página de Dezembro)
+  const fullDate = (monthsToAdd === 0 && baseIsoDate && /^\d{4}-\d{2}-\d{2}$/.test(String(baseIsoDate)))
+    ? String(baseIsoDate)
+    : `${yyyyMM}-${String(d).padStart(2, '0')}`;
   return { yyyyMM, mesAno, fullDate };
 }
 
@@ -1956,11 +1990,13 @@ window.saveConfirmedTransaction = function(e) {
     const idx = appState.transactions.findIndex(t => t.id === pendingReceiptData.editingId);
     if (idx !== -1) {
       const existingTx = appState.transactions[idx];
-      const { mesAno } = addMonthsToIsoDate(date, 0);
+      const targetRefMonth = getTransactionMonth(existingTx) || appState.currentMonth;
+      const mesAno = toMesAnoFromIso(targetRefMonth);
       appState.transactions[idx] = {
         ...existingTx,
         amount,
         date,
+        referencia_iso: targetRefMonth,
         mes_ano: mesAno,
         time,
         merchant,
@@ -2010,7 +2046,8 @@ window.saveConfirmedTransaction = function(e) {
     const arrayDeDespesas = [];
 
     for (let i = 0; i < installments; i++) {
-      const { mesAno, fullDate } = addMonthsToIsoDate(date, i);
+      // Usa sempre o mês da página atual (appState.currentMonth) como mês de referência base
+      const { yyyyMM, mesAno, fullDate } = addMonthsToIsoDate(date, i, appState.currentMonth);
       const itemMerchant = installments > 1
         ? `${cleanBaseMerchant} (${i + 1}/${installments})`
         : cleanBaseMerchant;
@@ -2022,6 +2059,7 @@ window.saveConfirmedTransaction = function(e) {
         parcelamento_id: parcelamentoId,
         amount: installmentAmount,
         date: fullDate,
+        referencia_iso: yyyyMM,
         mes_ano: mesAno,
         time,
         merchant: itemMerchant,
@@ -2035,11 +2073,6 @@ window.saveConfirmedTransaction = function(e) {
     }
 
     appState.transactions.unshift(...arrayDeDespesas);
-
-    const txMonth = date.slice(0, 7);
-    if (txMonth && txMonth.length === 7 && txMonth !== appState.currentMonth) {
-      appState.currentMonth = txMonth;
-    }
 
     if (window.CloudDB && window.CloudDB.isConfigured()) {
       if (typeof window.CloudDB.insertBatchTransactions === 'function') {
@@ -2330,12 +2363,16 @@ window.confirmAndSaveInvoiceItems = function() {
     const owner = (item.owner || 'gabriel').toLowerCase().trim();
     const sector = item.sector || 'compras';
     const dayPart = (item.date || '').split('-')[2] || '10';
-    const targetDate = `${appState.currentMonth}-${dayPart}`;
+    const targetDate = (item.date && /^\d{4}-\d{2}-\d{2}$/.test(String(item.date)))
+      ? String(item.date)
+      : `${appState.currentMonth}-${dayPart}`;
 
     const txObj = {
       id: 'tx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
       amount,
       date: targetDate,
+      referencia_iso: appState.currentMonth,
+      mes_ano: toMesAnoFromIso(appState.currentMonth),
       time: '12:00',
       merchant: cleanMerchant,
       owner,
@@ -2950,7 +2987,7 @@ function executeClearPersonMonthExpenses(personKey) {
   const upsertedCloudTxs = [];
 
   for (const tx of appState.transactions) {
-    if (!tx.date || !tx.date.startsWith(month)) {
+    if (getTransactionMonth(tx) !== month) {
       updatedTransactions.push(tx);
       continue;
     }
@@ -3015,10 +3052,10 @@ function executeClearCurrentMonthData() {
   appState.dismissedRecurringByMonth[month] = (appState.subscriptions || []).map(s => s.id);
 
   const deletedIds = appState.transactions
-    .filter(t => t.date && t.date.startsWith(month))
+    .filter(t => getTransactionMonth(t) === month)
     .map(t => t.id);
 
-  appState.transactions = appState.transactions.filter(t => !t.date || !t.date.startsWith(month));
+  appState.transactions = appState.transactions.filter(t => getTransactionMonth(t) !== month);
   if (appState.personBoardState) {
     appState.personBoardState.gabriel = { sectorFilter: 'all', collapsedSectors: {} };
     appState.personBoardState.mirela = { sectorFilter: 'all', collapsedSectors: {} };

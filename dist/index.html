@@ -363,6 +363,26 @@
       </section>
 
       <!-- ==================================================================
+           RESUMO DE GASTOS POR FORMA DE PAGAMENTO NO MÊS (CARTÃO DE CRÉDITO, PIX, DÉBITO, OUTROS)
+           ================================================================== -->
+      <section id="section-payment-methods" class="mb-10">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3.5">
+          <div class="flex items-center gap-2">
+            <h2 class="text-base sm:text-lg font-extrabold tracking-tight">💳 Gastos por Forma de Pagamento no Mês</h2>
+            <span id="payment-methods-total-count"
+              class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-500/15 text-purple-400 border border-purple-500/25">
+              0 lançamentos
+            </span>
+          </div>
+          <span class="text-xs text-slate-400">
+            Soma todos os setores (Mercado, Compras, Delivery, Transporte e Saúde) por meio de pagamento
+          </span>
+        </div>
+
+        <div id="payment-methods-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"></div>
+      </section>
+
+      <!-- ==================================================================
            1. DESPESAS: GABRIEL & MIRELA (AGRUPADAS POR CATEGORIA + LINHAS ULTRA-COMPACTAS)
            ================================================================== -->
       <section id="section-couple-boards" class="mb-10">
@@ -436,6 +456,8 @@
               <option value="PIX">⚡ PIX</option>
               <option value="Cartão de Crédito">💳 Crédito</option>
               <option value="Cartão de Débito">🏦 Débito</option>
+              <option value="Vale-Refeição">🍽️ Vale-Refeição</option>
+              <option value="Dinheiro">💵 Dinheiro</option>
             </select>
 
             <!-- Botões de Ação: w-full no mobile no fundo do formulário -->

@@ -567,6 +567,16 @@ function getMonthTransactions(yyyyMM = appState.currentMonth) {
   return appState.transactions.filter(t => getTransactionMonth(t) === yyyyMM);
 }
 
+function normalizePaymentMethodKey(rawMethod = '') {
+  const s = String(rawMethod || 'PIX').toLowerCase().trim();
+  if (s.includes('crédito') || s.includes('credito') || s === 'credit') return 'credito';
+  if (s.includes('débito') || s.includes('debito') || s === 'debit') return 'debito';
+  if (s.includes('vale') || s.includes('refeição') || s.includes('refeicao') || s === 'vr') return 'vr';
+  if (s.includes('dinheiro') || s.includes('espécie') || s.includes('especie')) return 'dinheiro';
+  if (s.includes('pix')) return 'pix';
+  return 'outros';
+}
+
 function calculateMonthlySummary(yyyyMM = appState.currentMonth) {
   const txs = getMonthTransactions(yyyyMM);
   const salaries = getMonthSalaries(yyyyMM);
@@ -590,15 +600,29 @@ function calculateMonthlySummary(yyyyMM = appState.currentMonth) {
     };
   });
 
+  const byPaymentMethod = {
+    credito: { id: 'credito', label: 'Cartão de Crédito', emoji: '💳', total: 0, count: 0, gabriel: 0, mirela: 0 },
+    pix: { id: 'pix', label: 'PIX', emoji: '⚡', total: 0, count: 0, gabriel: 0, mirela: 0 },
+    debito: { id: 'debito', label: 'Cartão de Débito', emoji: '🏦', total: 0, count: 0, gabriel: 0, mirela: 0 },
+    vr: { id: 'vr', label: 'Vale-Refeição', emoji: '🍽️', total: 0, count: 0, gabriel: 0, mirela: 0 },
+    dinheiro: { id: 'dinheiro', label: 'Dinheiro', emoji: '💵', total: 0, count: 0, gabriel: 0, mirela: 0 },
+    outros: { id: 'outros', label: 'Outros', emoji: '🧾', total: 0, count: 0, gabriel: 0, mirela: 0 }
+  };
+
   for (const tx of txs) {
     const val = parseAmountValue(tx.amount);
     const cleanMerchant = String(tx.merchant || '').replace(/\s*\(50%\s*Casal\)\s*$/i, '').trim();
     const normOwner = (tx.owner || 'casal').toLowerCase().trim();
+    const payKey = normalizePaymentMethodKey(tx.paymentMethod);
+    const payBucket = byPaymentMethod[payKey] || byPaymentMethod.outros;
 
     totalExpense += val;
+    payBucket.total += val;
+    payBucket.count += 1;
 
     if (normOwner === 'gabriel') {
       expensesGabriel += val;
+      payBucket.gabriel += val;
       gabrielTransactions.push({
         ...tx,
         amount: val,
@@ -608,6 +632,7 @@ function calculateMonthlySummary(yyyyMM = appState.currentMonth) {
       });
     } else if (normOwner === 'mirela') {
       expensesMirela += val;
+      payBucket.mirela += val;
       mirelaTransactions.push({
         ...tx,
         amount: val,
@@ -621,6 +646,8 @@ function calculateMonthlySummary(yyyyMM = appState.currentMonth) {
       expensesCasalShared += val;
       expensesGabriel += halfVal;
       expensesMirela += halfVal;
+      payBucket.gabriel += halfVal;
+      payBucket.mirela += halfVal;
 
       const sharedItem = {
         ...tx,
@@ -667,6 +694,7 @@ function calculateMonthlySummary(yyyyMM = appState.currentMonth) {
     gabrielTransactions,
     mirelaTransactions,
     bySector,
+    byPaymentMethod,
     topVillain,
     txCount: txs.length
   };
@@ -738,6 +766,13 @@ function renderAll() {
     renderSalariesAndTopCards(summary, prevSummary);
   } catch (err) {
     console.error('[Render] Erro em renderSalariesAndTopCards:', err);
+  }
+
+  // 1.1 Renderiza Resumo por Forma de Pagamento no Mês (Cartão de Crédito, PIX, Débito e Outros)
+  try {
+    renderPaymentMethodsSummary(summary);
+  } catch (err) {
+    console.error('[Render] Erro em renderPaymentMethodsSummary:', err);
   }
 
   // 2. Renderiza Quadro Horizontal Lado a Lado: DESPESAS GABRIEL | DESPESAS MIRELA
@@ -850,6 +885,146 @@ function renderSalariesAndTopCards(summary, prevSummary) {
 }
 
 /* ==========================================================================
+   2.1 RESUMO POR FORMA DE PAGAMENTO NO MÊS (CARTÃO DE CRÉDITO, PIX, DÉBITO, OUTROS)
+   ========================================================================== */
+
+function renderPaymentMethodsSummary(summary) {
+  const gridEl = document.getElementById('payment-methods-cards-grid');
+  const countBadgeEl = document.getElementById('payment-methods-total-count');
+  if (!gridEl) return;
+
+  const totalMonth = Number(summary?.totalExpense) || 0;
+  const txCount = Number(summary?.txCount) || 0;
+
+  if (countBadgeEl) {
+    countBadgeEl.textContent = `${txCount} ${txCount === 1 ? 'lançamento no mês' : 'lançamentos no mês'}`;
+  }
+
+  const pm = summary?.byPaymentMethod || {};
+  const credito = pm.credito || { total: 0, count: 0, gabriel: 0, mirela: 0 };
+  const pix = pm.pix || { total: 0, count: 0, gabriel: 0, mirela: 0 };
+  const debito = pm.debito || { total: 0, count: 0, gabriel: 0, mirela: 0 };
+  const vr = pm.vr || { total: 0, count: 0, gabriel: 0, mirela: 0 };
+  const dinheiro = pm.dinheiro || { total: 0, count: 0, gabriel: 0, mirela: 0 };
+  const outros = pm.outros || { total: 0, count: 0, gabriel: 0, mirela: 0 };
+
+  const outrosTotal = vr.total + dinheiro.total + outros.total;
+  const outrosCount = vr.count + dinheiro.count + outros.count;
+  const outrosGabriel = vr.gabriel + dinheiro.gabriel + outros.gabriel;
+  const outrosMirela = vr.mirela + dinheiro.mirela + outros.mirela;
+
+  const pct = (val) => (totalMonth > 0 ? ((val / totalMonth) * 100).toFixed(0) : '0');
+
+  const cards = [
+    {
+      title: 'Cartão de Crédito',
+      subtitle: 'Fatura acumulada no mês',
+      emoji: '💳',
+      total: credito.total,
+      count: credito.count,
+      sharePct: pct(credito.total),
+      gabriel: credito.gabriel,
+      mirela: credito.mirela,
+      featured: true,
+      accentText: 'text-purple-500',
+      badgeBg: 'bg-purple-500/15 text-purple-400 border border-purple-500/30',
+      barColor: 'bg-purple-500'
+    },
+    {
+      title: 'PIX',
+      subtitle: 'Transferências e pagamentos à vista',
+      emoji: '⚡',
+      total: pix.total,
+      count: pix.count,
+      sharePct: pct(pix.total),
+      gabriel: pix.gabriel,
+      mirela: pix.mirela,
+      featured: false,
+      accentText: 'text-emerald-500',
+      badgeBg: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30',
+      barColor: 'bg-emerald-500'
+    },
+    {
+      title: 'Cartão de Débito',
+      subtitle: 'Compras no débito automático/conta',
+      emoji: '🏦',
+      total: debito.total,
+      count: debito.count,
+      sharePct: pct(debito.total),
+      gabriel: debito.gabriel,
+      mirela: debito.mirela,
+      featured: false,
+      accentText: 'text-blue-500',
+      badgeBg: 'bg-blue-500/15 text-blue-400 border border-blue-500/30',
+      barColor: 'bg-blue-500'
+    },
+    {
+      title: 'Outras Opções (VR / Dinheiro)',
+      subtitle: `🍽️ VR: ${formatCurrency(vr.total)} • 💵 Dinheiro: ${formatCurrency(dinheiro.total + outros.total)}`,
+      emoji: '🍽️',
+      total: outrosTotal,
+      count: outrosCount,
+      sharePct: pct(outrosTotal),
+      gabriel: outrosGabriel,
+      mirela: outrosMirela,
+      featured: false,
+      accentText: 'text-amber-500',
+      badgeBg: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
+      barColor: 'bg-amber-500'
+    }
+  ];
+
+  gridEl.innerHTML = cards.map(c => `
+    <div class="card-surface p-4 sm:p-5 flex flex-col justify-between transition ${
+      c.featured
+        ? 'ring-1 ring-purple-500/40 bg-purple-500/[0.03] dark:bg-purple-500/[0.05]'
+        : ''
+    }">
+      <div>
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0 bg-slate-100 dark:bg-slate-800">
+              ${c.emoji}
+            </span>
+            <div class="min-w-0">
+              <h3 class="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white truncate">${c.title}</h3>
+              <p class="text-[11px] text-slate-400 truncate">${c.subtitle}</p>
+            </div>
+          </div>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${c.badgeBg}">
+            ${c.count} ${c.count === 1 ? 'item' : 'itens'}
+          </span>
+        </div>
+
+        <div class="mt-2 flex items-baseline justify-between gap-2">
+          <span class="text-xl sm:text-2xl font-extrabold tracking-tight ${c.total > 0 ? c.accentText : 'text-slate-400'}">
+            ${formatCurrency(c.total)}
+          </span>
+          <span class="text-[11px] font-semibold text-slate-400">
+            ${c.sharePct}% do mês
+          </span>
+        </div>
+
+        <div class="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mt-2">
+          <div class="h-full ${c.barColor} rounded-full transition-all duration-300" style="width: ${Math.min(100, Number(c.sharePct))}%"></div>
+        </div>
+      </div>
+
+      <div class="mt-3.5 pt-2.5 border-t border-slate-200/60 dark:border-white/[0.06] grid grid-cols-2 gap-2 text-[11px]">
+        <div class="truncate">
+          <span class="text-slate-400">👦 Gabriel:</span>
+          <strong class="text-slate-700 dark:text-slate-200 ml-0.5">${formatCurrency(c.gabriel)}</strong>
+        </div>
+        <div class="text-right truncate">
+          <span class="text-slate-400">👩 Mirela:</span>
+          <strong class="text-slate-700 dark:text-slate-200 ml-0.5">${formatCurrency(c.mirela)}</strong>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ==========================================================================
    3. QUADRO LADO A LADO NA HORIZONTAL: DESPESAS GABRIEL | DESPESAS MIRELA
    ========================================================================== */
 
@@ -867,6 +1042,16 @@ function renderCoupleHorizontalBoards(summary) {
     const computedTotalSpent = txs.reduce((acc, tx) => acc + parseAmountValue(tx.displayAmount ?? tx.amount), 0);
     const finalTotalSpent = computedTotalSpent > 0 ? computedTotalSpent : parseAmountValue(totalSpent);
     const finalBalanceVal = parseAmountValue(salaryVal) - finalTotalSpent;
+
+    const personPaymentTotals = { credito: 0, pix: 0, debito: 0, outros: 0 };
+    for (const tx of txs) {
+      const val = parseAmountValue(tx.displayAmount ?? tx.amount);
+      const pk = normalizePaymentMethodKey(tx.paymentMethod);
+      if (pk === 'credito') personPaymentTotals.credito += val;
+      else if (pk === 'pix') personPaymentTotals.pix += val;
+      else if (pk === 'debito') personPaymentTotals.debito += val;
+      else personPaymentTotals.outros += val;
+    }
 
     const personState = appState.personBoardState?.[personKey] || { sectorFilter: 'all', collapsedSectors: {} };
     const activeSectorFilter = personState.sectorFilter || 'all';
@@ -1038,6 +1223,28 @@ function renderCoupleHorizontalBoards(summary) {
               }).join('')}
             </div>
           `}
+        </div>
+
+        <!-- Resumo Individual por Forma de Pagamento (Cartão de Crédito, PIX, Débito e Outros) -->
+        <div class="px-4 py-2.5 bg-slate-50/90 dark:bg-slate-900/60 border-t border-slate-200/70 dark:border-slate-800/80 flex flex-wrap items-center gap-2 text-[11px]">
+          <span class="px-2 py-1 rounded-lg font-bold bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/30 flex items-center gap-1">
+            <span>💳 Crédito:</span>
+            <strong>${formatCurrency(personPaymentTotals.credito)}</strong>
+          </span>
+          <span class="px-2 py-1 rounded-lg font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+            <span>⚡ PIX:</span>
+            <strong>${formatCurrency(personPaymentTotals.pix)}</strong>
+          </span>
+          <span class="px-2 py-1 rounded-lg font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1">
+            <span>🏦 Débito:</span>
+            <strong>${formatCurrency(personPaymentTotals.debito)}</strong>
+          </span>
+          ${personPaymentTotals.outros > 0 ? `
+            <span class="px-2 py-1 rounded-lg font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
+              <span>🍽️ VR/Dinheiro:</span>
+              <strong>${formatCurrency(personPaymentTotals.outros)}</strong>
+            </span>
+          ` : ''}
         </div>
 
         <!-- Rodapé Igual à Planilha: TOTAL DE GASTOS + SALDO LIVRE INDIVIDUAL -->
